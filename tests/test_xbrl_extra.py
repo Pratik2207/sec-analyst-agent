@@ -1,4 +1,4 @@
-"""Phase 1 tester: extra unit tests for XBRL extraction, metric map and coverage (FR-2/3, X-1/2/3)."""
+"""Phase 1 tester: extra unit tests for XBRL extraction, metric map, coverage (FR-2/3, X-1/2/3)."""
 
 from datetime import date
 
