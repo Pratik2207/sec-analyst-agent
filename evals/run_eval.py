@@ -116,12 +116,15 @@ def run_systems(items: list[DatasetItem], names: list[str], raw: Path,
         with sysmod.settings_override(**overrides):
             for it in its:
                 old = load_result(raw, name, it.id)
-                if old and not (retry_errors and old.error):
+                # an edited question (user review) invalidates its cached run
+                fresh = old is not None and old.extra.get("question_sha") == _sha(it.question)
+                if fresh and not (retry_errors and old.error):
                     hits += 1
                     prog.step("", cached=True)
                     continue
                 rr = fn(it.question)
                 rr.qid, rr.system = it.id, name
+                rr.extra["question_sha"] = _sha(it.question)
                 _write(result_path(raw, name, it.id), rr.model_dump(mode="json"))
                 prog.step(f"{name} {it.id} {rr.wall_s:.1f}s"
                           + (f" ERROR {rr.error[:80]}" if rr.error else ""))
@@ -138,10 +141,16 @@ def judge_path(raw: Path, system: str, qid: str) -> Path:
     return raw / "judge" / _fname(system) / f"{qid}.json"
 
 
-def load_judgment(raw: Path, rr: RunResult) -> dict:
-    """Cached judgments for this exact answer ({} when none or stale)."""
+def _judge_key(item: DatasetItem, rr: RunResult) -> str:
+    """A judgment is valid for this question, gold answer and system answer only (the user
+    may edit questions or golds after review)."""
+    return _sha("|".join([item.question, item.gold_answer, rr.response.answer]))
+
+
+def load_judgment(raw: Path, rr: RunResult, item: DatasetItem) -> dict:
+    """Cached judgments for this exact question/gold/answer ({} when none or stale)."""
     d = _read(judge_path(raw, rr.system, rr.qid))
-    if not d or rr.response is None or d.get("answer_sha") != _sha(rr.response.answer):
+    if not d or rr.response is None or d.get("answer_sha") != _judge_key(item, rr):
         return {}
     return d
 
@@ -163,7 +172,7 @@ def run_judge(items: list[DatasetItem], names: list[str], raw: Path) -> dict:
             rr = load_result(raw, name, it.id)
             tasks = judge_tasks(it, rr) if rr else []
             if tasks:   # number/unanswerable/refused/errored results need no judge
-                have = load_judgment(raw, rr)
+                have = load_judgment(raw, rr, it)
                 work.append((it, rr, have, [t for t in tasks if t not in have]))
     prog = Progress("judge", len(work))
     stats = {"judge_cache_hits": 0, "judge_calls": 0, "judge_failed": 0}
@@ -172,7 +181,7 @@ def run_judge(items: list[DatasetItem], names: list[str], raw: Path) -> dict:
             stats["judge_cache_hits"] += 1
             prog.step("", cached=True)
             continue
-        rec = {**have, "answer_sha": _sha(rr.response.answer)}
+        rec = {**have, "answer_sha": _judge_key(it, rr)}
         for task in missing:
             if task == "correctness":
                 out = judge_mod.judge(it.question, it.gold_answer, rr.response.answer)
@@ -269,7 +278,7 @@ def build_report(run_id: str, dataset: Path, items: list[DatasetItem], names: li
             if rr is None:
                 missing += 1
                 continue
-            rows.append(report.score_result(it, rr, load_judgment(raw, rr)))
+            rows.append(report.score_result(it, rr, load_judgment(raw, rr, it)))
     agg = report.aggregate(rows)
     recall = report.recall_scores(items, load_retrieval(items, raw, skip_noheader))
     nfrs = report.nfr_check(agg, recall, rows)

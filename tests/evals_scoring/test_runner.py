@@ -194,6 +194,26 @@ def test_changed_answer_invalidates_judgment(env):
     assert len(env.llm_calls) == n + 2   # correctness + faithfulness for txt-1 only
 
 
+def test_edited_gold_invalidates_judgment_and_edited_question_reruns(env):
+    # the user reviews the dataset after a run: edits must not reuse stale caches
+    env.run("--skip-noheader", "--systems", "agent")
+    n_llm, n_sys = len(env.llm_calls), len(env.calls)
+    items = [json.loads(line) for line in env.ds.read_text(encoding="utf-8").splitlines()]
+    txt = next(i for i in items if i["id"] == "txt-1")
+    txt["gold_answer"] = txt["gold_answer"] + " (edited)"
+    env.ds.write_text("\n".join(json.dumps(i) for i in items), encoding="utf-8")
+    env.run("--skip-noheader", "--systems", "agent")
+    assert len(env.calls) == n_sys                  # same question: run reused
+    assert len(env.llm_calls) == n_llm + 2          # gold changed: re-judged
+    num = next(i for i in items if i["id"] == "num-1")
+    ANSWERS["Intel R&D in FY2024?"] = ANSWERS[num["question"]]
+    num["question"] = "Intel R&D in FY2024?"
+    env.ds.write_text("\n".join(json.dumps(i) for i in items), encoding="utf-8")
+    env.run("--skip-noheader", "--systems", "agent", "--skip-judge")
+    assert env.calls[-1][1] == "Intel R&D in FY2024?"   # question changed: re-run
+    del ANSWERS["Intel R&D in FY2024?"]
+
+
 # ---- scoring rules and NFR logic --------------------------------------------------------
 
 def _rr(system="agent", answer="x", error=None, route="agent", wall=10.0):
