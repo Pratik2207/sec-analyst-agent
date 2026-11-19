@@ -149,7 +149,7 @@ Tracks: parallel
   - track-b: answer writer and verifier; owns: `src/agent/answerer.py`, `src/agent/verifier.py`, `src/agent/prompts/answer*`, `tests/agent_answer/`
   - After the merge: API wiring and the end-to-end check.
 
-## Phase 5: Evals  [status: in progress]
+## Phase 5: Evals  [status: done — eval run + dataset approval deferred (user)]
 Goal: Score the agent against the naive baseline, plus ablations, on the 120-question set with one command.
 Requirements: FR-17, NFR-1, NFR-2, NFR-3, NFR-4, NFR-5, X-5, X-6
 Deliverables: `evals/dataset.jsonl` plus a validator; `evals/run_eval.py`; `evals/scoring/` (number exact match within ±1%, LLM judge on qwen3:8b, RAGAS faithfulness, recall@10, refusal accuracy, latency and tokens); `evals/results/<date>/report.md`.
