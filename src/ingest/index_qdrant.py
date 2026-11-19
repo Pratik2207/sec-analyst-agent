@@ -17,7 +17,7 @@ from src.ingest.chunk_schema import CHUNKS_DIR, point_id, read_chunks
 from src.retrieval.models import dense_model, qdrant, sparse_model
 
 BATCH = 64
-KEYWORD_FIELDS = ("ticker", "sector", "item")
+KEYWORD_FIELDS = ("ticker", "sector", "item", "accession_no")
 INTEGER_FIELDS = ("fiscal_year",)
 
 
@@ -54,23 +54,29 @@ def _points(chunks: list[dict]) -> list[models.PointStruct]:
     ]
 
 
+def _delete_filing(client: QdrantClient, collection: str, accession_no: str) -> None:
+    """Drop a filing's existing points, so a re-chunk that yields fewer chunks
+    leaves no stale points behind."""
+    client.delete(collection, points_selector=models.FilterSelector(filter=models.Filter(
+        must=[models.FieldCondition(key="accession_no",
+                                    match=models.MatchValue(value=accession_no))])))
+
+
 def index_chunks(paths: list[Path], collection: str | None = None) -> int:
-    """Upsert every chunk in `paths`; returns the number of points written."""
+    """Replace each file's filing in the collection; returns the number of points written.
+    Each chunk file holds one filing (chunk_schema: CHUNKS_DIR/<accession_no>.jsonl)."""
     collection = collection or get_settings().qdrant_collection
     client = qdrant()
     ensure_collection(client, collection)
     n = 0
-    batch: list[dict] = []
     for path in paths:
-        for chunk in read_chunks(path):
-            batch.append(chunk)
-            if len(batch) == BATCH:
-                client.upsert(collection, _points(batch))
-                n += len(batch)
-                batch = []
-    if batch:
-        client.upsert(collection, _points(batch))
-        n += len(batch)
+        chunks = list(read_chunks(path))
+        for accession_no in {c["accession_no"] for c in chunks}:
+            _delete_filing(client, collection, accession_no)
+        for i in range(0, len(chunks), BATCH):
+            batch = chunks[i:i + BATCH]
+            client.upsert(collection, _points(batch))
+            n += len(batch)
     return n
 
 

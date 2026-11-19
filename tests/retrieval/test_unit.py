@@ -7,7 +7,7 @@ import numpy as np
 from qdrant_client import models
 
 from src.ingest import index_qdrant
-from src.ingest.chunk_schema import point_id, read_chunks
+from src.ingest.chunk_schema import point_id, read_chunks, write_chunks
 from src.retrieval import hybrid_search as hs
 from src.retrieval import reranker
 from src.retrieval.models import BGE_QUERY_INSTRUCTION
@@ -84,6 +84,12 @@ class FakeQdrant:
     def upsert(self, collection, points):
         for p in points:
             self.upserted[p.id] = p
+
+    def delete(self, collection, points_selector):
+        (cond,) = points_selector.filter.must
+        acc = cond.match.value
+        self.upserted = {k: p for k, p in self.upserted.items()
+                         if p.payload["accession_no"] != acc}
 
 
 def _patch_models(monkeypatch, client, module):
@@ -178,3 +184,20 @@ def test_index_chunks_ids_and_payload(monkeypatch):
         assert p.payload == c
         assert set(p.vector) == {"dense", "sparse"}
         assert p.vector["dense"] == [float(len(c["text"]))] * 4
+
+
+def test_reindex_with_fewer_chunks_drops_stale_points(monkeypatch, tmp_path):
+    client = FakeQdrant()
+    _patch_models(monkeypatch, client, index_qdrant)
+    chunks = list(read_chunks(FIXTURE))
+    nvda = [c for c in chunks if c["ticker"] == "NVDA"]
+    full, shorter = tmp_path / "full.jsonl", tmp_path / "short.jsonl"
+    write_chunks(full, chunks)
+    write_chunks(shorter, nvda[:1])
+    index_qdrant.index_chunks([full], collection="c")
+    index_qdrant.index_chunks([shorter], collection="c")
+    remaining = {p.payload["ticker"]: 0 for p in client.upserted.values()}
+    for p in client.upserted.values():
+        remaining[p.payload["ticker"]] += 1
+    assert remaining["NVDA"] == 1                       # stale NVDA points removed
+    assert remaining["JPM"] == sum(c["ticker"] == "JPM" for c in chunks)  # others untouched
