@@ -87,12 +87,26 @@ _NUM = re.compile(r"(?<![\w.])[-−]?\(?\$?\(?\d[\d,]*(?:\.\d+)?\)?\s*"
 _SCALE = {"trillion": 1e12, "billion": 1e9, "bn": 1e9, "b": 1e9, "million": 1e6, "mn": 1e6,
           "m": 1e6, "thousand": 1e3, "k": 1e3}
 _YEARISH = re.compile(r"^(19|20)\d\d$")
+_ISO_DATE = re.compile(r"\b(?:19|20)\d\d-\d\d-\d\d\b")
+
+
+def strip_computed(text: str) -> str:
+    """Remove "(computed: ...)" copied from calc evidence, including nested parentheses."""
+    while (i := text.find("(computed:")) != -1:
+        depth, j = 0, i
+        for j in range(i, len(text)):
+            depth += {"(": 1, ")": -1}.get(text[j], 0)
+            if depth == 0:
+                break
+        text = (text[:i].rstrip() + text[j + 1:]).strip()
+    return text
 
 
 def numbers_in(text: str) -> list[float]:
     """Numbers stated in text, scaled ($16.55 billion -> 16.55e9; 75.0% -> 75.0).
-    Bare 4-digit years (2024, FY2025) and item numbers are skipped."""
+    Bare 4-digit years (2024, FY2025), ISO dates (2025-01-26) and item numbers are skipped."""
     out = []
+    text = _ISO_DATE.sub(" ", text)
     for m in _NUM.finditer(text):
         raw = m.group(0)
         unit = (m.group(1) or "").lower()

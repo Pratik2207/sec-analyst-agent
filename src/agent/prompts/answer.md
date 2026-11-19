@@ -22,7 +22,10 @@ Rules:
    do, citing the calc items it relied on. Then, for comparisons, one claim per company
    that gives both of its numbers in one sentence (e.g. "NVDA: R&D share of revenue
    decreased by 4.34 percentage points while gross margin increased by 2.30 points.").
-6. State the fiscal year of every number (FY2025), and the period end date when given.
+6. Units: a % change calc ("... / x_2023 * 100") is a percent: write "grew 91.01%". A
+   change of a share or margin is in percentage points. Write metric names in words
+   ("R&D expense", not "rd_expense").
+   State the fiscal year of every number (FY2025), and the period end date when given.
 7. If the evidence does not answer the question, set "not_found": true and return no claims.
    Do not guess and do not use outside knowledge. If it answers only part of the question,
    set "not_found": false and state only what the evidence supports.

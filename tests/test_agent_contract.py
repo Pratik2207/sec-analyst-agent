@@ -77,3 +77,14 @@ def test_plan_step_signature_ignores_goal():
     a = PlanStep(tool="sql_query", goal="x", tickers=["NVDA"], metrics=["revenue"])
     b = PlanStep(tool="sql_query", goal="y", tickers=["NVDA"], metrics=["revenue"])
     assert a.signature() == b.signature()
+
+
+def test_iso_dates_are_not_numbers():
+    assert numbers_in("JPM net income was 57,048,000,000 USD (period ending 2025-12-31).") == [
+        57_048e6]
+
+
+def test_strip_computed_handles_nested_parentheses():
+    from src.agent.evidence import strip_computed
+    t = "LLY revenue grew by 91.01% (computed: (revenue_2025 - revenue_2023) / revenue_2023 * 100)."
+    assert strip_computed(t) == "LLY revenue grew by 91.01%."

@@ -30,7 +30,7 @@ from pathlib import Path
 
 from config.settings import get_settings, load_companies
 from src.agent import llm
-from src.agent.evidence import evidence_items, numbers_in, render_evidence
+from src.agent.evidence import evidence_items, numbers_in, render_evidence, strip_computed
 from src.agent.state import Claim, Draft
 from src.agent.verifier import stated_in
 from src.api.schemas import Tokens
@@ -95,7 +95,7 @@ def _claims(raw: dict, ids: set[str], tool_results: list[ToolResult]) -> list[Cl
     for c in raw.get("claims") or []:
         if not isinstance(c, dict):
             continue
-        text = str(c.get("text") or "").strip()
+        text = strip_computed(str(c.get("text") or "").strip())   # no copied formulas
         sids = [s for s in dict.fromkeys(c.get("source_ids") or [])
                 if isinstance(s, str) and s in ids]
         named = _names(text, all_tickers, names)
