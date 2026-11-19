@@ -45,8 +45,8 @@ def stream_body(steps=STEPS, final=FINAL) -> bytes:
 @pytest.fixture(autouse=True)
 def _settings(monkeypatch):
     monkeypatch.setenv("SEC_USER_AGENT", "t t@example.com")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://x:y@127.0.0.1:1/x")
-    monkeypatch.setenv("AGENT_DATABASE_URL", "postgresql://x:y@127.0.0.1:1/x")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x:change-me@127.0.0.1:1/x")
+    monkeypatch.setenv("AGENT_DATABASE_URL", "postgresql://x:change-me@127.0.0.1:1/x")
     monkeypatch.setenv("API_URL", API)
     get_settings.cache_clear()
     yield
