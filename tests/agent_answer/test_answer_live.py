@@ -64,8 +64,9 @@ def test_multihop_claims_verify_and_resolve():
                                                 for i, c in enumerate(cites, 1)))
     # Only INTC meets both conditions in the fixture (R&D share +2.51 pts, margin -1.19 pts).
     assert "INTC" in text or "Intel" in text
-    others = [c.text for c in vr.ok_claims
-              if any(t in c.text for t in ("NVDA", "NVIDIA", "AMD", "QCOM", "Qualcomm"))]
+    # The others' R&D share fell; a claim saying it rose is a wrong conclusion.
+    others = [c.text for c in vr.ok_claims if "R&D" in c.text
+              and any(t in c.text for t in ("NVDA", "NVIDIA", "AMD", "QCOM", "Qualcomm"))]
     assert not any(w in t for t in others for w in ("raised", "increased", "rose")), others
 
 
