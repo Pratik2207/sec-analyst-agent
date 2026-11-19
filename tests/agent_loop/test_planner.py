@@ -38,6 +38,21 @@ def test_bad_steps_dropped(bad):
     assert [s.tool for s in steps] == ["sql_query"]
 
 
+def test_llm_shaped_steps():
+    """The schema's keys (about/action, every field present with ""/[] when unused)."""
+    raw = [{"about": "facts", "action": "sql_query", "sector": "semiconductors",
+            "tickers": ["NVDA", "AMD"], "metrics": ["revenue"], "fiscal_years": [2024],
+            "query": "", "item": "", "expression": "", "name": ""},
+           {"about": "x2", "action": "calculate", "sector": "", "tickers": ["NVDA"],
+            "metrics": [], "fiscal_years": [], "query": "", "item": "",
+            "expression": "revenue_2024 * 2", "name": "double"}]
+    sql, calc = planner.normalise(raw)
+    assert (sql.goal, sql.sector, sql.tickers, sql.item, sql.query) == (
+        "facts", "semiconductors", [], None, None)    # the sector covers the tickers
+    assert (calc.tool, calc.tickers, calc.sector, calc.name) == ("calculate", [], None,
+                                                                 "double")
+
+
 def test_calc_before_sql_dropped():
     assert [s.tool for s in planner.normalise([CALC, SQL])] == ["sql_query"]
 
@@ -75,9 +90,11 @@ def test_schema_uses_enums():
     assert set(item["tickers"]["items"]["enum"]) == set(planner.TICKERS)
     assert len(planner.TICKERS) == 50
     assert set(item["metrics"]["items"]["enum"]) == set(planner.METRICS)
-    assert item["sector"]["enum"] == planner.SECTORS
-    assert item["item"]["enum"] == ["1", "1A", "7", "7A"]
-    assert set(item["tool"]["enum"]) == {"sql_query", "search_filings", "get_section",
+    assert item["sector"]["enum"] == [*planner.SECTORS, ""]
+    assert item["item"]["enum"] == ["1", "1A", "7", "7A", ""]
+    assert set(planner.SCHEMA["properties"]["steps"]["items"]["required"]) == set(item)
+    assert list(item)[:2] == ["about", "action"] and sorted(item)[:2] == ["about", "action"]
+    assert set(item["action"]["enum"]) == {"sql_query", "search_filings", "get_section",
                                          "calculate", "list_companies"}
 
 

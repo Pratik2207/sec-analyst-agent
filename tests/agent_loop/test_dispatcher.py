@@ -87,13 +87,6 @@ def test_calculate_two_tickers_merged_into_one_result():
     assert res.data[1]["result"] == pytest.approx(13_000 / 52_000 * 100)
 
 
-def test_calculate_restricted_to_step_tickers():
-    step = PlanStep(tool="calculate", goal="g", tickers=["INTC"],
-                    expression="rd_expense_2025 / revenue_2025")
-    res, _ = graph.dispatch(step, [sql_result(SEMIS_FACTS)])
-    assert [d["ticker"] for d in res.data] == ["INTC"]
-
-
 def test_calculate_without_inputs_fails():
     step = PlanStep(tool="calculate", goal="g", expression="net_income_2025 * 2")
     res, _ = graph.dispatch(step, [sql_result(SEMIS_FACTS)])

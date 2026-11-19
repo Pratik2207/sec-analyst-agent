@@ -114,8 +114,6 @@ def run_calculate(step: PlanStep, prior: list[ToolResult]) -> tuple[ToolResult, 
                                "variables or does not parse"), []
     data, sources, notes = [], [], []
     for ticker, facts in _facts_by_ticker(prior).items():
-        if step.tickers and ticker not in step.tickers:
-            continue
         missing = sorted(n for n in names if n not in facts)
         if missing:
             notes.append(f"{ticker}: missing {', '.join(missing)}")

@@ -31,26 +31,29 @@ MIN_YEAR, MAX_YEAR = 1990, 2100
 
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "plan.md"
 
+MAX_PLAN_TICKERS = 8   # more than this is a sector question
+# Every field is required: small models skip optional fields they need. "" / [] mean "not
+# used"; normalise() maps them to None / []. Ollama emits the properties in alphabetical
+# order, so the goal and the tool are called "about" and "action" to come first (and
+# "sector" comes before "tickers").
+_STEP_PROPS = {
+    "about": {"type": "string", "description": "the goal: what this step finds out"},
+    "action": {"type": "string", "enum": TOOLS, "description": "the tool"},
+    "sector": {"type": "string", "enum": [*SECTORS, ""]},
+    "tickers": {"type": "array", "maxItems": MAX_PLAN_TICKERS,
+                "items": {"type": "string", "enum": TICKERS}},
+    "metrics": {"type": "array", "items": {"type": "string", "enum": METRICS}},
+    "fiscal_years": {"type": "array", "items": {"type": "integer"}},
+    "query": {"type": "string"},
+    "item": {"type": "string", "enum": [*ITEMS, ""]},
+    "expression": {"type": "string"},
+    "name": {"type": "string"},
+}
 SCHEMA = {
     "type": "object",
     "properties": {"steps": {
         "type": "array", "minItems": 1, "maxItems": MAX_TOOL_CALLS,
-        "items": {
-            "type": "object",
-            "properties": {
-                "tool": {"type": "string", "enum": TOOLS},
-                "goal": {"type": "string"},
-                "tickers": {"type": "array", "items": {"type": "string", "enum": TICKERS}},
-                "sector": {"type": "string", "enum": SECTORS},
-                "metrics": {"type": "array", "items": {"type": "string", "enum": METRICS}},
-                "fiscal_years": {"type": "array", "items": {"type": "integer"}},
-                "query": {"type": "string"},
-                "item": {"type": "string", "enum": ITEMS},
-                "expression": {"type": "string"},
-                "name": {"type": "string"},
-            },
-            "required": ["tool", "goal"],
-        },
+        "items": {"type": "object", "properties": _STEP_PROPS, "required": list(_STEP_PROPS)},
     }},
     "required": ["steps"],
 }
@@ -133,10 +136,12 @@ def _fetched(name: str, earlier: list[PlanStep]) -> bool:
 def normalise_step(raw, earlier: list[PlanStep]) -> list[PlanStep]:
     """Zero or more valid steps for one raw step from the LLM. A search_filings or
     get_section step over several tickers becomes one step per ticker."""
-    if not isinstance(raw, dict) or raw.get("tool") not in TOOLS:
+    if not isinstance(raw, dict):
         return []
-    tool = raw["tool"]
-    goal = (_opt_str(raw.get("goal")) or tool)[:300]
+    tool = raw.get("action", raw.get("tool"))
+    if tool not in TOOLS:
+        return []
+    goal = (_opt_str(raw.get("about", raw.get("goal"))) or tool)[:300]
     tickers = _unique([t.strip().upper() for t in _str_list(raw.get("tickers"))
                        if t.strip().upper() in TICKERS])
     sector = _opt_str(raw.get("sector"))
@@ -155,8 +160,10 @@ def normalise_step(raw, earlier: list[PlanStep]) -> list[PlanStep]:
     if tool == "sql_query":
         if not metrics or not (tickers or sector):
             return []
-        return [PlanStep(tool=tool, goal=goal, tickers=tickers, sector=sector,
-                         metrics=metrics, fiscal_years=years)]
+        # A sector covers its tickers; ticker lists next to a sector are often a partial
+        # copy of it (the schema caps them at MAX_PLAN_TICKERS), so the sector wins.
+        return [PlanStep(tool=tool, goal=goal, tickers=[] if sector else tickers,
+                         sector=sector, metrics=metrics, fiscal_years=years)]
     if tool == "search_filings":
         if not query:
             return []
@@ -176,8 +183,8 @@ def normalise_step(raw, earlier: list[PlanStep]) -> list[PlanStep]:
             return []
         if not (name and name.isidentifier()):
             name = "result"
-        return [PlanStep(tool=tool, goal=goal, tickers=tickers, expression=expression,
-                         name=name)]
+        # No tickers: the calculation runs for every company the sql steps fetched.
+        return [PlanStep(tool=tool, goal=goal, expression=expression, name=name)]
     return [PlanStep(tool=tool, goal=goal, sector=sector)]   # list_companies
 
 
