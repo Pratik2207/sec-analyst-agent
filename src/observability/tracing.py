@@ -14,10 +14,12 @@ interface, so tracing is a no-op when Langfuse is not configured (no keys) or un
         t.update(output={"answer": ...}, metadata={"latency_ms": ...})
 """
 
+import logging
 from contextlib import contextmanager
 from functools import lru_cache
 from typing import Any, Protocol
 
+from config.settings import get_settings
 from src.api.schemas import Tokens
 
 
@@ -59,4 +61,14 @@ class NoopTracer:
 def get_tracer() -> Tracer:
     """LangfuseTracer when settings.tracing_enabled, else NoopTracer. Never raises: a
     Langfuse problem must not break /ask. [track-b fills in the Langfuse branch]"""
-    return NoopTracer()
+    try:
+        s = get_settings()
+        if not s.tracing_enabled:
+            return NoopTracer()
+        from src.observability.langfuse_tracer import create_tracer
+
+        return create_tracer(s.langfuse_host, s.langfuse_public_key, s.langfuse_secret_key)
+    except Exception as e:
+        logging.getLogger(__name__).warning("Langfuse tracing disabled: %s: %s",
+                                            type(e).__name__, e)
+        return NoopTracer()
