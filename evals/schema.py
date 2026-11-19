@@ -4,10 +4,11 @@ evals/dataset.jsonl holds one DatasetItem per line (EXPECTED_COUNTS per type).
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.api.schemas import AskResponse
 
@@ -39,6 +40,14 @@ class DatasetItem(BaseModel):
     gold_contains: list[str] = []
     author: str = "claude"            # "claude" | "user" (PRD 12: someone else writes ~20)
     notes: str = ""
+
+    @field_validator("id")
+    @classmethod
+    def _safe_id(cls, v: str) -> str:
+        # ids become cache file names (evals/results/<run>/raw/<system>/<id>.json)
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,39}", v):
+            raise ValueError(f"id {v!r}: letters, digits, _ and - only (no paths)")
+        return v
 
 
 class RunResult(BaseModel):

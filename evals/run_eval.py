@@ -28,6 +28,7 @@ import time
 from datetime import date
 from pathlib import Path
 
+from config.settings import get_settings
 from evals import systems as sysmod
 from evals.schema import DATASET, DatasetItem, RunResult, load_dataset
 from evals.scoring import judge as judge_mod
@@ -116,15 +117,15 @@ def run_systems(items: list[DatasetItem], names: list[str], raw: Path,
         with sysmod.settings_override(**overrides):
             for it in its:
                 old = load_result(raw, name, it.id)
-                # an edited question (user review) invalidates its cached run
-                fresh = old is not None and old.extra.get("question_sha") == _sha(it.question)
+                # an edited question (user review) or changed models invalidates the run
+                fresh = old is not None and is_fresh(old, it)
                 if fresh and not (retry_errors and old.error):
                     hits += 1
                     prog.step("", cached=True)
                     continue
                 rr = fn(it.question)
                 rr.qid, rr.system = it.id, name
-                rr.extra["question_sha"] = _sha(it.question)
+                rr.extra.update(stamp(it))
                 _write(result_path(raw, name, it.id), rr.model_dump(mode="json"))
                 prog.step(f"{name} {it.id} {rr.wall_s:.1f}s"
                           + (f" ERROR {rr.error[:80]}" if rr.error else ""))
@@ -139,6 +140,21 @@ def _sha(text: str) -> str:
 
 def judge_path(raw: Path, system: str, qid: str) -> Path:
     return raw / "judge" / _fname(system) / f"{qid}.json"
+
+
+def _config_sha() -> str:
+    """The models a cached run was produced with; changing any of them re-runs it."""
+    s = get_settings()
+    return _sha("|".join([s.fast_model, s.planner_model, s.answer_model, s.grader_model,
+                          s.embed_model, s.rerank_model, s.sparse_model]))
+
+
+def stamp(item: DatasetItem) -> dict:
+    return {"question_sha": _sha(item.question), "config_sha": _config_sha()}
+
+
+def is_fresh(rr: RunResult, item: DatasetItem) -> bool:
+    return all(rr.extra.get(k) == v for k, v in stamp(item).items())
 
 
 def _judge_key(item: DatasetItem, rr: RunResult) -> str:
@@ -215,7 +231,8 @@ def run_retrieval(items: list[DatasetItem], raw: Path, skip_noheader: bool) -> d
     for config in configs:
         for it in its:
             path = retrieval_path(raw, config, it.id)
-            if path.exists():
+            cached = _read(path)
+            if cached and cached.get("question_sha") == _sha(it.question):
                 hits += 1
                 prog.step("", cached=True)
                 continue
@@ -226,7 +243,8 @@ def run_retrieval(items: list[DatasetItem], raw: Path, skip_noheader: bool) -> d
                 log(f"[retrieval] {config} {it.id} ERROR {type(e).__name__}: {e}"[:300])
                 prog.step("", cached=True)
                 continue
-            _write(path, {"qid": it.id, "config": config, "payloads": payloads})
+            _write(path, {"qid": it.id, "config": config, "question_sha": _sha(it.question),
+                          "payloads": payloads})
             prog.step(f"{config} {it.id}")
     return {"retrieval_cache_hits": hits, "retrieval_errors": errors}
 
@@ -237,7 +255,7 @@ def load_retrieval(items: list[DatasetItem], raw: Path, skip_noheader: bool) -> 
         found = {}
         for it in items:
             d = _read(retrieval_path(raw, config, it.id))
-            if d:
+            if d and d.get("question_sha") == _sha(it.question):   # stale ones not scored
                 found[it.id] = d["payloads"]
         skipped = skip_noheader and config == "no_headers"
         out[config] = None if skipped and not found else found
@@ -275,7 +293,7 @@ def build_report(run_id: str, dataset: Path, items: list[DatasetItem], names: li
     for name in names:
         for it in system_items(name, items):
             rr = load_result(raw, name, it.id)
-            if rr is None:
+            if rr is None or not is_fresh(rr, it):   # stale results are not scored
                 missing += 1
                 continue
             rows.append(report.score_result(it, rr, load_judgment(raw, rr, it)))

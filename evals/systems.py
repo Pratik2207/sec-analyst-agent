@@ -11,6 +11,7 @@ Ablations (PRD 10):
                         full, no_reranker, no_sparse, no_headers (separate collection)
 """
 
+import re
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -49,10 +50,33 @@ def _fact_contexts(steps: list[Step]) -> list[str]:
     return out
 
 
+_ITEM_HEAD = re.compile(r"^([A-Z.]{1,6})\s+FY(\d{4})")
+
+
+def _ordered_contexts(items: list, resp) -> list[str]:
+    """Facts and calcs first, then text from the filings the answer cites, then the rest:
+    the faithfulness judge truncates contexts, and must not lose what the answer cites
+    (Phase 5 review: two 8-chunk searches overflow the budget)."""
+    cited = {(c.ticker, c.fiscal_year) for c in resp.citations}
+
+    def rank(it) -> int:
+        if it.kind in ("fact", "calc"):
+            return 0
+        m = _ITEM_HEAD.match(it.text)
+        return 1 if m and (m.group(1), int(m.group(2))) in cited else 2
+
+    return [it.text for it in sorted(items, key=rank)]
+
+
 def agent_system(question: str) -> RunResult:
     t0 = time.perf_counter()
     try:
         r = router.route(question)
+        # The fast path IS a SQL lookup: with sql_query disabled (the "text only" ablation)
+        # every question must go through the agent, or number questions keep using SQL.
+        if r.kind == "fast" and "sql_query" in get_settings().agent_disabled_tools:
+            r = router.Route("agent", reason="fast path disabled (sql_query ablation)",
+                             tokens=r.tokens)
         if r.kind == "fast":
             resp = fast_path.answer(question, r)
             contexts = _fact_contexts(resp.steps)
@@ -62,7 +86,7 @@ def agent_system(question: str) -> RunResult:
                           *resp.steps]
             resp.tokens.prompt += r.tokens.prompt
             resp.tokens.completion += r.tokens.completion
-            contexts = [it.text for it in evidence.evidence_items(tool_results)]
+            contexts = _ordered_contexts(evidence.evidence_items(tool_results), resp)
         wall = time.perf_counter() - t0
         resp.latency_ms = int(wall * 1000)
         return RunResult(qid="", system="agent", response=resp, contexts=contexts,

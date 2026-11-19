@@ -125,3 +125,54 @@ def test_percentiles():
     assert percentile([5, 1, 3], 50) == 3
     s = summarize([1.0, 2.0, 3.0], [100, 200])
     assert s == {"n": 3, "p50_s": 2.0, "p95_s": pytest.approx(2.9), "tokens_mean": 150}
+
+
+# ---- Phase 5 code-review fixes -------------------------------------------------------------
+
+@pytest.mark.parametrize("answer", [
+    "I could not find NVIDIA FY2030 revenue in the filings.",
+    "The context doesn't mention FY2030 revenue.",
+    "No FY2030 data is available in the provided filings.",
+    "Sorry, that information isn't available.",
+    "The answer is not in the provided context.",
+    "FY2030 revenue is not yet available.",
+])
+def test_review_refusal_paraphrases(answer):
+    from evals.scoring.refusal import is_refusal
+    assert is_refusal(answer)
+
+
+def test_answer_with_number_is_not_a_refusal():
+    from evals.scoring.refusal import is_refusal
+    assert not is_refusal("Intel did not report a gross profit line; its gross margin was 32.7% "
+                          "in FY2024.")
+
+
+def test_negative_usd_gold_needs_loss_wording_and_percent_never_matches_usd():
+    from evals.scoring.numbers import number_correct
+    assert not number_correct("Intel's net income was $18.76 billion.", -18.756e9, "USD")
+    assert number_correct("Intel had a net loss of $18.76 billion.", -18.756e9, "USD")
+    assert not number_correct("Net margin was 17.1%.", 17.12e9, "USD")
+
+
+def test_no_sql_ablation_forces_agent_route(monkeypatch):
+    from evals import systems
+    from src.agent import fast_path, graph, router
+    from src.agent.router import FactQuery, Route
+    from src.api.schemas import AskResponse, Tokens
+
+    monkeypatch.setattr(router, "route", lambda q: Route("fast", FactQuery("INTC", "revenue",
+                                                                            2024)))
+    monkeypatch.setattr(fast_path, "answer", lambda *a: pytest.fail("fast path used"))
+    monkeypatch.setattr(graph, "run_agent_traced", lambda q: (AskResponse(
+        answer="x", citations=[], steps=[], tokens=Tokens(), latency_ms=0), []))
+    with systems.settings_override(agent_disabled_tools=["sql_query"]):
+        rr = systems.agent_system("What was Intel's revenue in FY2024?")
+    assert rr.error is None and rr.route == "agent"
+
+
+@pytest.mark.parametrize("bad", ["../x", "num-001/../../y", "a.b", "a b", "-x"])
+def test_dataset_ids_are_path_safe(bad):
+    from evals.schema import DatasetItem
+    with pytest.raises(ValueError):
+        DatasetItem(id=bad, type="number", question="q", gold_answer="a")

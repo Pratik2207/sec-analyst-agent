@@ -461,7 +461,8 @@ def multihop_specs() -> list[dict]:
 
     # 1 highest bank net income
     o, s = ranked(BANKS, lambda t, y: v(t, y, "net_income"), 2025, usd)
-    add("Which bank had the highest net income in FY2025?",
+    add("Which bank had the highest net income in FY2025: JPMorgan Chase, Bank of America "
+        "or Goldman Sachs?",
         f"{NAMES[o[0]]} ({o[0]}) had the highest FY2025 net income: {s}.",
         v(o[0], 2025, "net_income"), "USD", [(t, 2025) for t in BANKS])
     # 2 LLY revenue growth 23->25
@@ -472,12 +473,12 @@ def multihop_specs() -> list[dict]:
         r2(g), "%", [("LLY", 2023), ("LLY", 2025)])
     # 3 rank semis by FY2024 gross margin
     o, s = ranked(SEMIS, gm, 2024, p)
-    add("Rank the semiconductor companies by FY2024 gross margin.",
+    add("Rank NVIDIA, AMD, Intel and Qualcomm by FY2024 gross margin.",
         f"FY2024 gross margin (gross profit / revenue), highest to lowest: {s}.",
         None, None, [(t, 2024) for t in SEMIS], notes="ranking; no single gold_value")
     # 4 pharma R&D intensity FY2024
     o, s = ranked(PHARMA, rdi, 2024, p)
-    add("Which pharma company spent the most on R&D relative to revenue in FY2024?",
+    add("Which of Pfizer, Eli Lilly and Merck spent the most on R&D relative to revenue in FY2024?",
         f"{NAMES[o[0]]} had the highest R&D-to-revenue ratio in FY2024: {s}.",
         r2(rdi(o[0], 2024)), "%", [(t, 2024) for t in PHARMA])
     # 5 AMD GM change 23->24
@@ -500,7 +501,7 @@ def multihop_specs() -> list[dict]:
         d, "USD", [("INTC", 2023), ("INTC", 2024)])
     # 8 highest semis operating margin FY2025
     o, s = ranked(SEMIS, om, 2025, p)
-    add("Which semiconductor company had the highest operating margin in FY2025?",
+    add("Which had the highest operating margin in FY2025: NVIDIA, AMD, Intel or Qualcomm?",
         f"{NAMES[o[0]]} had the highest FY2025 operating margin (operating income / revenue): "
         f"{s}.",
         r2(om(o[0], 2025)), "%", [(t, 2025) for t in SEMIS])
@@ -544,7 +545,7 @@ def multihop_specs() -> list[dict]:
         tot, "USD", [(t, 2025) for t in BANKS])
     # 15 largest pharma revenue FY2025
     o, s = ranked(PHARMA, lambda t, y: v(t, y, "revenue"), 2025, usd)
-    add("Which pharmaceutical company had the largest revenue in 2025?",
+    add("Which had the largest revenue in 2025: Pfizer, Eli Lilly or Merck?",
         f"{NAMES[o[0]]} had the largest FY2025 revenue, narrowly: {s}.",
         v(o[0], 2025, "revenue"), "USD", [(t, 2025) for t in PHARMA])
     # 16 rank pharma by FY2025 net income
@@ -566,7 +567,7 @@ def multihop_specs() -> list[dict]:
         r2(d), "pp", [("INTC", 2023), ("INTC", 2025)])
     # 19 largest semis R&D FY2025 (absolute)
     o, s = ranked(SEMIS, lambda t, y: v(t, y, "rd_expense"), 2025, usd)
-    add("Which semiconductor company spent the most on R&D in FY2025, in dollars?",
+    add("Which of NVIDIA, AMD, Intel and Qualcomm spent the most on R&D in FY2025, in dollars?",
         f"{NAMES[o[0]]} spent the most on R&D in FY2025: {s} (each company's own fiscal year).",
         v(o[0], 2025, "rd_expense"), "USD", [(t, 2025) for t in SEMIS])
     # 20 NVDA net margin change 24->25
@@ -610,7 +611,7 @@ def multihop_specs() -> list[dict]:
         tot, "USD", [(t, 2023) for t in PHARMA])
     # 26 largest semis total assets FY2025
     o, s = ranked(SEMIS, lambda t, y: v(t, y, "total_assets"), 2025, usd)
-    add("Which chipmaker had the largest total assets at the end of FY2025?",
+    add("Which had the largest total assets at the end of FY2025: NVIDIA, AMD, Intel or Qualcomm?",
         f"{NAMES[o[0]]} had the largest FY2025 total assets: {s}.",
         v(o[0], 2025, "total_assets"), "USD", [(t, 2025) for t in SEMIS])
     # 27 GS revenue growth 24->25
