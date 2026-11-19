@@ -57,7 +57,7 @@ def test_percentages_from_calc_results():
 
 def test_percent_vs_fraction_result():
     res = verify(Draft(claims=[Claim(text="Margin was 75.0%.", source_ids=["calc:f"])]),
-                 [calcs_fraction()])
+                 [calcs_fraction(), facts()])
     assert res.ok_claims
 
 
@@ -65,7 +65,7 @@ def calcs_fraction():
     from src.tools.types import Source, ToolResult
     return ToolResult(ok=True, data=[{"source_id": "calc:f", "ticker": "NVDA", "name": "gm",
                                       "expression": "gp / rev", "values": {}, "result": 0.7499,
-                                      "input_source_ids": []}],
+                                      "input_source_ids": [NVDA_FY25_XBRL]}],
                       sources=[Source(source_id="calc:f", kind="calc")])
 
 

@@ -25,7 +25,10 @@ from src.tools.types import ToolResult
 
 _LABEL = re.compile(
     r"(?<![\w.,$\-−(])(\d{1,2})[A-Ca-c]?(?![\d%]|[.,]\d)"
-    r"(?!\s*(?:percent|trillion|billion|million|thousand|bn|mn|[kmb]\b))", re.I)
+    r"(?!\s*(?:percent|trillion|billion|million|thousand|bn|mn|[kmb]\b|"
+    r"(?:percentage |basis )?points?\b|pp\b|bps\b))", re.I)
+# labels inside filing text ("Form 10-K", "Item 7", "Note 3") are not citable values
+_FORM_NAMES = re.compile(r"\b\d{1,2}-[KQ]\b|\b(?:Item|Note|Part)\s+\d+[A-C]?\b", re.I)
 
 
 def checked_numbers(text: str) -> list[float]:
@@ -66,7 +69,7 @@ def _pool(sid: str, items: dict[str, list[dict]], depth: int = 0) -> list[float]
                 for inner in d.get("input_source_ids", []):
                     out.extend(_pool(inner, items, depth + 1))
         elif "text" in d:
-            out.extend(numbers_in(d["text"]))
+            out.extend(checked_numbers(_FORM_NAMES.sub(" ", d["text"])))
     return out
 
 
@@ -102,10 +105,19 @@ def stated_in(text: str, source_ids: list[str], tool_results: list[ToolResult],
 # company the claim names, a clause that says up/down about a quantity must agree with the
 # sign of that company's change calc for the quantity.
 
+# bare "up"/"down" only when followed by by/from/a number ("made up half" is not a rise)
+_MOVED = r"(?:went|gone|go|goes|going|moved|was|were|is|are|been)\s+"
 _UP = re.compile(r"\b(rais\w*|increas\w*|rose|rise[sn]?|grew|grow\w*|higher|expand\w*|"
-                 r"improv\w*|up)\b", re.I)
-_DOWN = re.compile(r"\b(fell|fall\w*|decreas\w*|declin\w*|lower\w*|drop\w*|down|"
-                   r"shr[ai]nk\w*|contract\w*|reduc\w*)\b", re.I)
+                 r"improv\w*|" + _MOVED + r"up|up(?=\s+(?:by|from|\d|\$)))\b", re.I)
+_DOWN = re.compile(r"\b(fell|fall\w*|decreas\w*|declin\w*|lower\w*|drop\w*|" + _MOVED
+                   + r"down|down(?=\s+(?:by|from|\d|\$))|shr[ai]nk\w*|contract\w*|"
+                   r"reduc\w*)\b", re.I)
+# "did not raise" states the opposite direction; negated clauses are not checked
+_NEGATION = re.compile(r"\b(not|n't|never|no longer|neither|nor|none)\b|n't\b", re.I)
+# comparisons between companies ("raised it more than INTC") state a relation, not each
+# company's own direction: not checked
+_COMPARATIVE = re.compile(r"\bthan\b|\bcompared (?:to|with)\b|\bversus\b|\bvs\.?", re.I)
+_CLAUSE_YEAR = re.compile(r"\b(?:FY\s?)?((?:19|20)\d\d)\b", re.I)
 _CLAUSE = re.compile(r",|;|:|\.\s|\bbut\b|\bwhile\b|\bwhereas\b|\bwith\b|\band\b", re.I)
 _GENERIC = {"change", "chg", "diff", "delta", "growth", "yoy", "pct", "percent", "of", "to",
             "vs", "increase", "decrease", "the", "a"}
@@ -116,9 +128,15 @@ def _companies() -> dict[str, re.Pattern]:
     from config.settings import load_companies  # local import: config is cheap, avoids cycles
     out = {}
     for c in load_companies():
-        alts = [re.escape(c["ticker"])] + ([re.escape(c["name"])] if c.get("name") else [])
-        out[c["ticker"]] = re.compile(r"\b(" + "|".join(alts) + r")\b")
+        # ticker: case-sensitive ("ON", "C" are words); name: case-insensitive ("Nvidia")
+        name = rf"|(?i:{re.escape(c['name'])})" if c.get("name") else ""
+        out[c["ticker"]] = re.compile(rf"\b({re.escape(c['ticker'])}{name})\b")
     return out
+
+
+def _end_year(expression: str) -> int | None:
+    years = [int(y) for y in re.findall(r"_((?:19|20)\d\d)\b", expression)]
+    return max(years) if years else None
 
 
 def _quantity_matches(name: str, clause: str) -> bool:
@@ -140,15 +158,22 @@ def direction_conflict(text: str, items: dict[str, list[dict]]) -> str | None:
                and is_change(d.get("name") or "", d.get("expression") or "")]
     for clause in _CLAUSE.split(text):
         up, down = bool(_UP.search(clause)), bool(_DOWN.search(clause))
-        if up == down:        # no direction word, or both: nothing to check
+        if up == down or _COMPARATIVE.search(clause) or _NEGATION.search(clause):
+            continue   # nothing (unambiguous) to check
             continue
         said = "increased" if up else "decreased"
-        # A clause is about the companies it names; a clause naming none inherits the
-        # claim's company only when the claim names exactly one ("Gross margin fell only for
-        # QCOM" must not be checked against AMD named elsewhere in the claim).
-        subjects = [t for t in named if companies[t].search(clause)] or (
-            named if len(named) == 1 else [])
+        # A clause is about the company it names; a clause naming none inherits the claim's
+        # company only when the claim names exactly one ("Gross margin fell only for QCOM"
+        # must not be checked against AMD named elsewhere). A clause naming two or more
+        # companies with one direction word is ambiguous: skipped (false negative accepted).
+        in_clause = [t for t in named if companies[t].search(clause)]
+        subjects = in_clause if len(in_clause) == 1 else (
+            named if not in_clause and len(named) == 1 else [])
+        # A clause that names a year is about the change ending in that year.
+        years = {int(y) for y in _CLAUSE_YEAR.findall(clause)}
         for d in changes:
+            if years and _end_year(d.get("expression") or "") not in years:
+                continue
             if d["ticker"] in subjects and _quantity_matches(d["name"], clause) and direction(
                     d["result"]) not in (said, "unchanged"):
                 return (f"{d['ticker']} {d['name']} = {d['result']:.4g} "
@@ -183,8 +208,14 @@ def _check(claim: Claim, items: dict[str, list[dict]], known: set[str]) -> str |
 def verify(draft: Draft, tool_results: list[ToolResult]) -> VerifyResult:
     result = VerifyResult()
     items, known = _index(tool_results)
+    from src.agent.evidence import resolve
+
     for claim in draft.claims:
         reason = _check(claim, items, known)
+        # FR-11: a claim must end up with a filing citation (a list_companies-only claim
+        # would render with no [n])
+        if reason is None and not resolve(claim.source_ids, tool_results):
+            reason = "cites no filing source (only " + ", ".join(claim.source_ids) + ")"
         if reason is None:
             result.ok_claims.append(claim)
         else:

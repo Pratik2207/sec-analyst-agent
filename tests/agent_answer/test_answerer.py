@@ -111,10 +111,19 @@ def test_no_evidence_is_not_found_without_llm_call(stub):
     assert s.calls == []
 
 
-def test_llm_error_is_not_found(stub):
+def test_llm_error_propagates_to_the_graph(stub):
+    # Phase 4 review: swallowing it hid the failure (the graph's "answer writer failed" flag
+    # never fired) and made a failed re-answer discard already-verified claims
     stub(error=llm.LLMError("qwen3:4b-instruct: invalid JSON"))
-    draft, tokens = answerer.answer("q", EVIDENCE)
-    assert draft.not_found and draft.claims == [] and tokens == Tokens()
+    with pytest.raises(llm.LLMError):
+        answerer.answer("q", EVIDENCE)
+
+
+def test_model_written_citation_markers_are_stripped(stub):
+    stub({"not_found": False, "claims": [
+        {"text": "NVIDIA revenue rose [2] in FY2025 [1, 3].", "source_ids": [NVDA_FY25_XBRL]}]})
+    draft, _ = answerer.answer("q", EVIDENCE)
+    assert draft.claims[0].text == "NVIDIA revenue rose in FY2025."
 
 
 def test_at_most_six_claims(stub):

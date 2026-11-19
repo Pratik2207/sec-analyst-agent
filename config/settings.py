@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     planner_think: bool = False
     grader_model: str = "qwen3:1.7b"
     llm_num_ctx: int = 8192   # agent LLM calls (Ollama default 4096 is too small for evidence)
+    # Per agent LLM call; a model swap on the 4 GB GPU can take ~60 s, the slowest observed
+    # answer ~270 s. A stalled Ollama becomes LLMError instead of hanging /ask forever.
+    llm_timeout_s: float = 300.0
 
 
 @lru_cache

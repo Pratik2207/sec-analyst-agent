@@ -235,6 +235,13 @@ def grade_node(state: AgentState) -> dict:
     plan, retries = list(state["plan"]), dict(state["retries"])
     used = retries.get(idx, 0)
     retrying = g.retry_step is not None and used < MAX_RETRIES
+    # A grader rewrite that repeats an earlier call (search A -> B -> back to A) would trip
+    # the repeated-call stop and skip the rest of the plan: cancel the retry and move on.
+    # The repeat-stop still applies to plan steps (NFR-7).
+    rewrite_repeats = (retrying and g.retry_step.signature() != step.signature()
+                       and g.retry_step.signature() in state["signatures"])
+    if rewrite_repeats:
+        retrying = False
     if retrying:
         plan[idx] = g.retry_step
         retries[idx] = used + 1
@@ -248,7 +255,8 @@ def grade_node(state: AgentState) -> dict:
     if g.keep_ids is not None:
         detail["kept"] = len(results[-1].data)
     if g.retry_step is not None and not retrying:
-        detail["retry_skipped"] = f"max {MAX_RETRIES} retries used"
+        detail["retry_skipped"] = ("rewrite repeats an earlier call" if rewrite_repeats
+                                   else f"max {MAX_RETRIES} retries used")
     return {"tool_results": results, "plan": plan, "retries": retries, "step_idx": next_idx,
             "stop_reason": stop, "flags": [*state["flags"], *([flag] if flag else [])],
             "trace": [*state["trace"], Step(name="grade", detail=detail)],
@@ -276,23 +284,30 @@ def answer_node(state: AgentState) -> dict:
 
 def verify_node(state: AgentState) -> dict:
     draft = state["draft"]
+    earlier = state.get("verified") or []   # claims that passed on the first attempt
     if draft is None or draft.not_found or not draft.claims:
+        if earlier:   # the re-answer failed or gave up: keep what was already verified
+            return {"feedback": None, "draft": Draft(claims=earlier),
+                    "flags": [*state["flags"], "re-answer failed; kept verified claims"]}
         return {"feedback": None}
     vr = verifier.verify(draft, state["tool_results"])
     failed = [{"claim": c.text, "reason": r} for c, r in vr.failed_claims]
     trace = [*state["trace"], Step(name="verify", detail={"ok": len(vr.ok_claims),
                                                           "failed": failed})]
     if not vr.failed_claims:
+        if len(earlier) > len(vr.ok_claims):   # re-answer dropped verified content
+            return {"trace": trace, "feedback": None, "draft": Draft(claims=earlier)}
         return {"trace": trace, "feedback": None}
     if state["answer_retries"] < MAX_ANSWER_RETRIES:
         feedback = "These claims failed verification; fix or drop them:\n" + "\n".join(
             f"- {f['claim']} ({f['reason']})" for f in failed)
-        return {"trace": trace, "feedback": feedback,
+        return {"trace": trace, "feedback": feedback, "verified": vr.ok_claims,
                 "answer_retries": state["answer_retries"] + 1}
     flags = [*state["flags"], *(f"removed unverified claim: {c.text}" for c, _ in
                                vr.failed_claims)]
+    claims = vr.ok_claims if len(vr.ok_claims) >= len(earlier) else earlier
     return {"trace": trace, "feedback": None, "flags": flags,
-            "draft": Draft(claims=vr.ok_claims, not_found=not vr.ok_claims)}
+            "draft": Draft(claims=claims, not_found=not claims)}
 
 
 def _after_grade(state: AgentState) -> str:
@@ -322,7 +337,8 @@ def build_graph():
 
 def initial_state(question: str) -> AgentState:
     return AgentState(question=question, plan=[], step_idx=0, tool_results=[], step_results={},
-                      retries={}, tool_calls=0, signatures=[], draft=None, answer_retries=0,
+                      retries={}, tool_calls=0, signatures=[], draft=None, verified=[],
+                      answer_retries=0,
                       feedback=None, flags=[], stop_reason=None, trace=[], tokens=Tokens())
 
 

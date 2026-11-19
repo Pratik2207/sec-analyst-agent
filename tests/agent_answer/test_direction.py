@@ -9,20 +9,27 @@ from src.tools.types import Source, ToolResult
 CALCS = ToolResult(ok=True, data=[
     {"source_id": "calc:1", "ticker": "NVDA", "name": "rd_share_change", "result": -0.043,
      "expression": "rd_expense_2025/revenue_2025 - rd_expense_2024/revenue_2024",
-     "values": {}, "input_source_ids": []},
+     "values": {}, "input_source_ids": ["xbrl:A"]},
     {"source_id": "calc:2", "ticker": "NVDA", "name": "gross_margin_change", "result": 0.023,
      "expression": "gross_profit_2025/revenue_2025 - gross_profit_2024/revenue_2024",
-     "values": {}, "input_source_ids": []},
+     "values": {}, "input_source_ids": ["xbrl:A"]},
     {"source_id": "calc:3", "ticker": "QCOM", "name": "gross_margin_change", "result": -0.008,
      "expression": "gross_profit_2025/revenue_2025 - gross_profit_2024/revenue_2024",
-     "values": {}, "input_source_ids": []},
+     "values": {}, "input_source_ids": ["xbrl:A"]},
     {"source_id": "calc:4", "ticker": "NVDA", "name": "rd_share_2025", "result": 0.099,
-     "expression": "rd_expense_2025/revenue_2025", "values": {}, "input_source_ids": []},
+     "expression": "rd_expense_2025/revenue_2025", "values": {}, "input_source_ids": ["xbrl:A"]},
 ], sources=[Source(source_id=f"calc:{i}", kind="calc") for i in range(1, 5)])
+# the facts the calcs were computed from (FR-11: claims must resolve to a filing citation)
+FACTS = ToolResult(ok=True, data=[
+    {"source_id": "xbrl:A", "ticker": "NVDA", "fiscal_year": 2025, "metric": "revenue",
+     "value": 1.0, "accession_no": "A"}],
+    sources=[Source(source_id="xbrl:A", kind="xbrl", ticker="NVDA", form="10-K",
+                    fiscal_year=2025, section="Item 8", url="https://www.sec.gov/a",
+                    accession_no="A")])
 
 
 def _ok(text, ids=("calc:1", "calc:2", "calc:3")):
-    res = verify(Draft(claims=[Claim(text=text, source_ids=list(ids))]), [CALCS])
+    res = verify(Draft(claims=[Claim(text=text, source_ids=list(ids))]), [CALCS, FACTS])
     return not res.failed_claims, res.failed_claims
 
 

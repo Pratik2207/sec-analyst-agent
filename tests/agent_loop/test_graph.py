@@ -160,13 +160,29 @@ def test_repeated_identical_call_stops_early(monkeypatch):
     assert resp.answer != NOT_FOUND     # partial answer from the first call
 
 
-def test_rewrite_back_to_earlier_query_is_a_repeat(monkeypatch):
+def test_rewrite_back_to_earlier_query_skips_retry_and_continues_plan(monkeypatch):
+    # Phase 4 review: a grader rewrite that repeats an earlier call used to trip the
+    # repeated-call stop and skip the rest of the plan; now the retry is cancelled instead
     f = Fake(monkeypatch, [PlanStep(tool="search_filings", goal="g", query="a"),
-                           PlanStep(tool="search_filings", goal="g", query="b")])
-    replies = iter([{"relevant_ids": [1], "rewrite": ""}, {"relevant_ids": [], "rewrite": "a"}])
+                           PlanStep(tool="search_filings", goal="g", query="b"),
+                           PlanStep(tool="search_filings", goal="g", query="c")])
+    replies = iter([{"relevant_ids": [1], "rewrite": ""}, {"relevant_ids": [], "rewrite": "a"},
+                    {"relevant_ids": [1], "rewrite": ""}])
     monkeypatch.setattr(graph.grader, "chat_json", lambda *a, **k: (next(replies), Tokens()))
     resp = graph.run_agent("q")
-    assert [c["query"] for c in f.search_calls] == ["a", "b"]
+    assert [c["query"] for c in f.search_calls] == ["a", "b", "c"]   # c still runs
+    assert graph.FLAG_REPEAT not in flags(resp)
+    skipped = [s.detail for s in resp.steps if s.name == "grade" and "retry_skipped" in s.detail]
+    assert skipped and skipped[0]["retry_skipped"] == "rewrite repeats an earlier call"
+
+
+def test_identical_plan_step_still_stops(monkeypatch):
+    f = Fake(monkeypatch, [PlanStep(tool="search_filings", goal="g", query="a"),
+                           PlanStep(tool="search_filings", goal="other", query="a")])
+    monkeypatch.setattr(graph.grader, "chat_json",
+                        lambda *a, **k: ({"relevant_ids": [1], "rewrite": ""}, Tokens()))
+    resp = graph.run_agent("q")
+    assert [c["query"] for c in f.search_calls] == ["a"]
     assert graph.FLAG_REPEAT in flags(resp)
 
 

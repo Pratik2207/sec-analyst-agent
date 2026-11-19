@@ -79,6 +79,7 @@ class AgentState(TypedDict, total=False):
     tool_calls: int                       # executions so far (<= MAX_TOOL_CALLS)
     signatures: list[str]                 # PlanStep.signature() of every executed call
     draft: Draft | None
+    verified: list[Claim]                 # claims that passed verify on an earlier attempt
     answer_retries: int
     feedback: str | None                  # verifier feedback for the re-answer
     flags: list[str]                      # e.g. "step cap reached", "claim removed: ..."

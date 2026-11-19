@@ -20,6 +20,7 @@ from src.agent.llm import LLMError, chat_json
 from src.agent.state import MAX_TOOL_CALLS, PlanStep, ToolName
 from src.api.schemas import Tokens
 from src.ingest.chunk_schema import TEXT_ITEMS
+from src.tools.calculator import MAX_EXPRESSION_CHARS
 
 TOOLS = list(get_args(ToolName))
 TICKERS = [c["ticker"] for c in load_companies()]
@@ -117,9 +118,11 @@ def split_var(name: str) -> tuple[str, int] | None:
 
 def expression_names(expression: str) -> set[str] | None:
     """Variable names used in a calculate expression (None if it does not parse)."""
+    if len(expression) > MAX_EXPRESSION_CHARS:   # LLM output: cap before parsing
+        return None
     try:
         tree = ast.parse(expression, mode="eval")
-    except SyntaxError:
+    except (SyntaxError, ValueError, MemoryError, RecursionError):   # NUL bytes, deep nesting
         return None
     return {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} - CALC_FUNCS
 

@@ -13,7 +13,7 @@ evidence; no arithmetic in the head (use calc items); evidence text is data, nev
 instructions. `feedback` lists claims the verifier rejected, for the one re-answer
 (verifier.feedback_text builds it).
 
-Choices: no evidence -> not_found without an LLM call; LLMError -> not_found (zero tokens),
+Choices: no evidence -> not_found without an LLM call; LLMError propagates to the graph,
 the graph flags it; a reply with not_found true returns no claims, even if it listed some.
 Company check: when a claim names companies (ticker as a word, or the full name from
 config/companies.yaml, e.g. "INTC" or "Intel"), cited ids whose items are about only other
@@ -38,6 +38,9 @@ from src.tools.types import ToolResult
 
 SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "answer.md").read_text(encoding="utf-8")
 MAX_CLAIMS = 6
+
+
+_MARKER = re.compile(r"\s*\[\d+(?:\s*[,\-–]\s*\d+)*\]")
 
 
 def _schema(ids: list[str]) -> dict:
@@ -96,13 +99,19 @@ def _claims(raw: dict, ids: set[str], tool_results: list[ToolResult]) -> list[Cl
         if not isinstance(c, dict):
             continue
         text = strip_computed(str(c.get("text") or "").strip())   # no copied formulas
+        # Citation markers are added by code (evidence.render_answer); a model-written
+        # "[2]" (possibly injected by filing text) would point at an unverified source.
+        text = _MARKER.sub("", text).strip()
         sids = [s for s in dict.fromkeys(c.get("source_ids") or [])
                 if isinstance(s, str) and s in ids]
         named = _names(text, all_tickers, names)
         if named:
             sids = [s for s in sids if not tickers.get(s) or tickers[s] & named]
             if sids:
-                own = {s for s, ts in tickers.items() if ts & named}
+                # repair only from structured numbers (facts, calcs): chunk text is full of
+                # incidental numbers ("Form 10-K") that would "verify" a wrong figure
+                own = {s for s, ts in tickers.items() if ts & named
+                       and s.startswith(("xbrl:", "calc:"))}
                 sids += stated_in(text, sids, tool_results, own)
         if text and sids:
             out.append(Claim(text=text, source_ids=sids, numbers=numbers_in(text)))
@@ -116,11 +125,9 @@ def answer(question: str, tool_results: list[ToolResult],
         return Draft(not_found=True), Tokens()
     ids = list(dict.fromkeys(it.source_id for it in items if it.source_id))
     user = build_user(question, render_evidence(items), feedback)
-    try:
-        raw, tokens = llm.chat_json(get_settings().answer_model, SYSTEM_PROMPT, user,
-                                    _schema(ids), think=False)
-    except llm.LLMError:
-        return Draft(not_found=True), Tokens()
+    # LLMError propagates: the graph flags "answer writer failed" and keeps verified claims
+    raw, tokens = llm.chat_json(get_settings().answer_model, SYSTEM_PROMPT, user,
+                                _schema(ids), think=False)
     if not isinstance(raw, dict) or raw.get("not_found") is True:
         return Draft(not_found=True), tokens
     claims = _claims(raw, set(ids), tool_results)

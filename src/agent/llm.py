@@ -29,7 +29,7 @@ def chat_json(model: str, system: str, user: str, schema: dict,
               think: bool = False) -> tuple[dict, Tokens]:
     s = get_settings()
     try:
-        resp = ollama.Client(host=s.ollama_host).chat(
+        resp = ollama.Client(host=s.ollama_host, timeout=s.llm_timeout_s).chat(
             model=model,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             format=schema, think=think,
