@@ -73,12 +73,14 @@ def index_chunks(paths: list[Path], collection: str | None = None) -> int:
         chunks = list(read_chunks(path))
         # The file name is the accession number (chunk_schema contract), so an empty file
         # still clears its filing.
+        # Embed the whole filing before touching the collection, so an embedding failure
+        # (e.g. out of memory) leaves the previously indexed version in place.
+        points = [p for i in range(0, len(chunks), BATCH) for p in _points(chunks[i:i + BATCH])]
         for accession_no in {path.stem} | {c["accession_no"] for c in chunks}:
             _delete_filing(client, collection, accession_no)
-        for i in range(0, len(chunks), BATCH):
-            batch = chunks[i:i + BATCH]
-            client.upsert(collection, _points(batch))
-            n += len(batch)
+        for i in range(0, len(points), BATCH):
+            client.upsert(collection, points[i:i + BATCH])
+        n += len(points)
     return n
 
 

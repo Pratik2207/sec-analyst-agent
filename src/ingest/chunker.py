@@ -46,10 +46,21 @@ def _sentences(paragraph: str) -> list[str]:
     return [s for s in _SENTENCE_SPLIT.split(paragraph) if s.strip()]
 
 
+def _hard_split(word: str, max_tokens: int) -> list[str]:
+    """Split one whitespace-free "word" (e.g. a 450-char underscore signature line, a dot
+    leader, a long URL) into character slices of <= max_tokens tokens each."""
+    if count_tokens(word) <= max_tokens or len(word) == 1:
+        return [word]
+    mid = len(word) // 2
+    return _hard_split(word[:mid], max_tokens) + _hard_split(word[mid:], max_tokens)
+
+
 def _word_windows(text: str, max_tokens: int) -> list[str]:
-    """Split one over-long sentence (or table row) at word boundaries."""
+    """Split one over-long sentence (or table row) at word boundaries; a single word longer
+    than max_tokens is itself split into character slices."""
     out, cur, cur_tok = [], [], 0
-    for w in text.split():
+    words = [p for w in text.split() for p in _hard_split(w, max_tokens)]
+    for w in words:
         t = count_tokens(w)
         if cur and cur_tok + t > max_tokens:
             out.append(" ".join(cur))
@@ -101,6 +112,14 @@ def split_text(paragraphs: list[str], budget: int, min_tokens: int, overlap: int
             tok += units[i + n_new][1]
             cur.append(units[i + n_new])
             n_new += 1
+        if n_new == 0:
+            # No progress (the next unit doesn't fit after the overlap carry). Units are
+            # capped at unit_max so this shouldn't happen; never loop or emit carry-only
+            # chunks: drop the carry, and fail loudly if even that doesn't help.
+            if not carry:
+                raise ValueError(f"unit of {units[i][1]} tokens exceeds budget {budget}")
+            carry = []
+            continue
         if i + n_new < len(units):   # not the last piece: prefer a paragraph boundary
             cut, run = None, sum(u[1] for u in carry)
             for k in range(n_new):

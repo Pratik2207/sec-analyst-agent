@@ -19,7 +19,7 @@ def build_filter(filters: SearchFilters | None) -> models.Filter | None:
         value = getattr(filters, f.name)
         if value is None:
             continue
-        match = (models.MatchAny(any=list(value)) if isinstance(value, list)
+        match = (models.MatchAny(any=list(value)) if isinstance(value, (list, tuple, set))
                  else models.MatchValue(value=value))
         must.append(models.FieldCondition(key=f.name, match=match))
     return models.Filter(must=must) if must else None

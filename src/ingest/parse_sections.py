@@ -398,13 +398,22 @@ def main() -> None:
     SECTIONS_DIR.mkdir(parents=True, exist_ok=True)
     with open(MANIFEST, encoding="utf-8") as f:
         records = [json.loads(line) for line in f if line.strip()]
+    failed = []
     for rec in records:
-        parsed = parse_filing(rec)
+        try:
+            parsed = parse_filing(rec)
+        except (RecursionError, ValueError, OSError) as e:   # one bad filing mustn't stop the run
+            log.error("FAILED %s FY%s %s: %s: %s", rec["ticker"], rec["fiscal_year"],
+                      rec["accession_no"], type(e).__name__, e)
+            failed.append(rec["accession_no"])
+            continue
         out = SECTIONS_DIR / f"{rec['accession_no']}.json"
         out.write_text(json.dumps(parsed, ensure_ascii=False), encoding="utf-8")
         summary = ", ".join(f"{k}:{len(v['sections'])}" for k, v in parsed["items"].items())
         log.info("%s FY%s %s -> %s%s", rec["ticker"], rec["fiscal_year"], rec["accession_no"],
                  summary, " (fallback)" if parsed["fallback"] else "")
+    if failed:
+        log.error("%d filing(s) failed to parse: %s", len(failed), ", ".join(failed))
 
 
 if __name__ == "__main__":

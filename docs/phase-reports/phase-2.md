@@ -77,6 +77,29 @@ After the LLY re-parse, the default config was re-run: 20/20, p50 2.36 s.
    - Strip `ix:hidden` and zero-size text before indexing.
 9. **For Phase 3+:** treat retrieved chunk text as untrusted data in the prompts (indirect prompt injection). Never let chunk text pick tools or SQL.
 
+## Follow-up after user review (2026-11-19)
+You asked for item 1 to be fixed and left the low-priority items to Claude. Decisions:
+
+**Fixed:**
+- **Item 1, chunker hang.** `_hard_split` cuts any whitespace-free word over the limit into character slices. `split_text` also guards against a pass that makes no progress: it drops the carry, and fails loudly if even that doesn't help. The reviewer's repro now finishes in milliseconds (`tests/ingest_text/test_chunker_long_words.py`).
+- **Item 2, re-index atomicity.** A filing is fully embedded before its old points are deleted.
+- **Item 5.** Tuple and set filters now become `MatchAny`.
+- **Security hardening:**
+  - SEC-supplied `files[*].name` and `primaryDocument` are checked against SEC's own name shapes, so they can't escape the cache folder or alter the URL. A bad name skips that filing with a warning.
+  - `SecClient.get_bytes` streams the response and caps it at 100 MB.
+  - The parser logs and skips a filing that fails, instead of aborting the run.
+
+**Deferred to Phase 6 (50-company scale-up):**
+- Items 3, 4 and 6 (the furniture heuristic, the backward MD&A search, Intel's layout). They only matter for new layouts, and the coverage check at scale will show which ones are needed.
+- The Qdrant API key, which needs a `.env` change by you.
+- Pinning model revisions and running HF offline.
+
+**Deferred to Phase 4:** stripping hidden text. It goes with the agent's prompt-injection handling (retrieved text is treated as data).
+
+**Skipped:** item 7, the cosmetic `is_table` flag on 6 MRK chunks.
+
+Tests: 272 passed.
+
 ## Deviations from the plan
 - **Chunks are ≤ 480 tokens, not 500–800.** bge-small and the rerankers read at most 512 tokens.
 - **fastembed (ONNX) instead of sentence-transformers.** The same models, without installing PyTorch, which saves disk.

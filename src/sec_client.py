@@ -10,6 +10,8 @@ import httpx
 
 from config.settings import get_settings
 
+MAX_BYTES = 100 * 1024 * 1024   # largest pilot 10-K is ~13 MB; companyfacts JSON ~10 MB
+
 
 class RateLimiter:
     """Allows at most `rate` calls per second by spacing calls 1/rate seconds apart."""
@@ -51,15 +53,21 @@ class SecClient:
         self.network_calls = 0
 
     def get_bytes(self, url: str, retries: int = 3) -> bytes:
+        """GET with retries on 429/5xx. The (decompressed) body is capped at MAX_BYTES."""
         for attempt in range(retries):
             self.limiter.wait()
             self.network_calls += 1
-            resp = self.http.get(url)
-            if resp.status_code in (429, 500, 502, 503) and attempt < retries - 1:
-                time.sleep(2**attempt)
-                continue
-            resp.raise_for_status()
-            return resp.content
+            with self.http.stream("GET", url) as resp:
+                if resp.status_code in (429, 500, 502, 503) and attempt < retries - 1:
+                    time.sleep(2**attempt)
+                    continue
+                resp.raise_for_status()
+                body = bytearray()
+                for part in resp.iter_bytes():
+                    body += part
+                    if len(body) > MAX_BYTES:
+                        raise ValueError(f"response from {url} exceeds {MAX_BYTES} bytes")
+                return bytes(body)
         raise RuntimeError("unreachable")
 
     def get_json_cached(self, url: str, cache_path: Path) -> dict:

@@ -15,6 +15,7 @@ Usage: uv run python -m src.ingest.download_filings [--all]
 import argparse
 import json
 import logging
+import re
 from pathlib import Path
 
 from config.settings import DATA_DIR, ROOT, load_companies
@@ -35,10 +36,23 @@ ORDER BY f.ticker, f.fiscal_year"""
 log = logging.getLogger(__name__)
 
 
+# Names from SEC's submissions JSON become cache paths and URL path segments: allow only
+# the shapes SEC uses, so a bad value can't escape data/raw/ or alter the URL.
+SUBMISSIONS_PAGE_RE = re.compile(r"CIK\d{10}-submissions-\d{3}\.json")
+DOCUMENT_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+def _check_name(name: str, pattern: re.Pattern, what: str) -> str:
+    if not pattern.fullmatch(name) or ".." in name:
+        raise ValueError(f"unexpected {what} from SEC submissions: {name!r}")
+    return name
+
+
 def _find_in_page(page: dict, accession_no: str) -> str | None:
     accns = page.get("accessionNumber", [])
     if accession_no in accns:
-        return page["primaryDocument"][accns.index(accession_no)]
+        doc = page["primaryDocument"][accns.index(accession_no)]
+        return _check_name(doc, DOCUMENT_RE, "primaryDocument")
     return None
 
 
@@ -55,8 +69,9 @@ def primary_document(client: SecClient, cik: str, accession_no: str,
     for extra in sub["filings"].get("files", []):
         if doc is not None:
             break
-        page = client.get_json_cached(SUBMISSIONS_URL.format(name=extra["name"]),
-                                      submissions_dir / extra["name"])
+        page_name = _check_name(extra["name"], SUBMISSIONS_PAGE_RE, "submissions page")
+        page = client.get_json_cached(SUBMISSIONS_URL.format(name=page_name),
+                                      submissions_dir / page_name)
         doc = _find_in_page(page, accession_no)
     if doc is None:
         raise LookupError(f"{accession_no} not found in submissions for CIK{cik}")
@@ -77,7 +92,7 @@ def download(refs: list[dict], client: SecClient, filings_dir: Path = FILINGS_DI
         path = filings_dir / ref["ticker"] / f"{ref['accession_no']}.htm"
         try:
             doc = primary_document(client, ref["cik"], ref["accession_no"], submissions_dir)
-        except LookupError as e:
+        except (LookupError, ValueError) as e:
             log.warning("skipping %s %s: %s", ref["ticker"], ref["fiscal_year"], e)
             continue
         url = ARCHIVE_URL.format(cik=int(ref["cik"]),
