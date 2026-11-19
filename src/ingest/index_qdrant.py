@@ -71,7 +71,9 @@ def index_chunks(paths: list[Path], collection: str | None = None) -> int:
     n = 0
     for path in paths:
         chunks = list(read_chunks(path))
-        for accession_no in {c["accession_no"] for c in chunks}:
+        # The file name is the accession number (chunk_schema contract), so an empty file
+        # still clears its filing.
+        for accession_no in {path.stem} | {c["accession_no"] for c in chunks}:
             _delete_filing(client, collection, accession_no)
         for i in range(0, len(chunks), BATCH):
             batch = chunks[i:i + BATCH]

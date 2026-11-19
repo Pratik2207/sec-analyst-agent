@@ -99,8 +99,9 @@ def test_fallback_is_rare_and_limited_to_known_filings():
 
 
 def test_risk_factors_are_split_into_many_sections():
-    """One section per risk: every non-fallback 1A has many titled sections (each pilot
-    10-K lists 16+ risks)."""
+    """One section per risk: every non-fallback 1A has many titled sections. The smallest
+    pilot 1A is LLY FY2023/FY2024 with exactly 14 risk titles (verified against the HTML:
+    19 bold blocks = 5 category headings + 14 bold-bullet risks), so the floor is 12."""
     few = []
     for r in RECORDS:
         parsed = json.loads((SECTIONS_DIR / f"{r['accession_no']}.json")
@@ -108,7 +109,7 @@ def test_risk_factors_are_split_into_many_sections():
         if parsed["fallback"]:
             continue
         titled = [s for s in parsed["items"]["1A"]["sections"] if s["title"]]
-        if len(titled) < 15:
+        if len(titled) < 12:
             few.append((r["ticker"], r["fiscal_year"], len(titled)))
     assert few == []
 

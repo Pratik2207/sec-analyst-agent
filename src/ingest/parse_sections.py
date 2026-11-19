@@ -310,9 +310,18 @@ def body_font_size(blocks: list[Block]) -> float | None:
     return sizes.most_common(1)[0][0] if sizes else None
 
 
+def _bold_bullet(b: Block) -> bool:
+    return b.kind == "text" and b.text[0] in BULLETS and b.bold
+
+
 def is_heading(b: Block, body_size: float | None) -> bool:
+    """Bold/underlined or larger-font short block. Bullet-led blocks are body text, except
+    fully bold ones (some filers, e.g. LLY, write each risk title as a bold bullet);
+    split_sections decides those with a look-ahead."""
     t = b.text
-    if b.kind != "text" or len(t) > MAX_HEADING_CHARS or t[0] in BULLETS:
+    if b.kind != "text" or len(t) > MAX_HEADING_CHARS:
+        return False
+    if t[0] in BULLETS and not b.bold:
         return False
     if not any(c.isalpha() for c in t):
         return False
@@ -329,13 +338,19 @@ def _continues(prev: str, nxt: str) -> bool:
 def split_sections(blocks: list[Block], body_size: float | None) -> list[dict]:
     sections: list[dict] = []
     cur: dict = {"title": "", "blocks": []}
-    for b in blocks:
-        if b.furniture:
-            continue
-        if is_heading(b, body_size):
+    content = [b for b in blocks if not b.furniture]
+    for i, b in enumerate(content):
+        heading = is_heading(b, body_size)
+        if heading and _bold_bullet(b):
+            # A bold bullet followed by another bold bullet is a bold list (body text);
+            # a bold bullet followed by prose is a risk-factor-style title.
+            nxt = content[i + 1] if i + 1 < len(content) else None
+            heading = nxt is not None and not _bold_bullet(nxt)
+        if heading:
             if cur["blocks"]:
                 sections.append(cur)
-            cur = {"title": b.text, "blocks": []}   # consecutive headings: the last one wins
+            title = b.text.lstrip(BULLETS + " ") if _bold_bullet(b) else b.text
+            cur = {"title": title, "blocks": []}   # consecutive headings: the last one wins
         elif b.kind == "table":
             cur["blocks"].append({"type": "table", "text": b.text})
         else:
