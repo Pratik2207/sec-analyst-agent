@@ -1,0 +1,54 @@
+# XBRL us-gaap tag -> canonical metric (FR-3).
+# For each metric, tags are tried in order; the first tag reported in the 10-K for that
+# fiscal year wins. `kind` is duration (a full fiscal year) or instant (balance at period end).
+# `derive` is used only when none of the tags is reported: value = a - b, where a and b are
+# canonical metrics or helpers. The stored xbrl_tag is then "derived:<tag_a>-<tag_b>".
+metrics:
+  revenue:
+    kind: duration
+    tags:
+      - Revenues
+      - RevenueFromContractWithCustomerExcludingAssessedTax
+      - RevenueFromContractWithCustomerIncludingAssessedTax
+      - RevenuesNetOfInterestExpense
+      - SalesRevenueNet
+  gross_profit:
+    kind: duration
+    tags:
+      - GrossProfit
+    derive: [revenue, cost_of_revenue]
+  rd_expense:
+    kind: duration
+    tags:
+      - ResearchAndDevelopmentExpense
+      - ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost
+      - ResearchAndDevelopmentExpenseSoftwareExcludingAcquiredInProcessCost
+  operating_income:
+    kind: duration
+    tags:
+      - OperatingIncomeLoss
+  net_income:
+    kind: duration
+    tags:
+      - NetIncomeLoss
+      - ProfitLoss
+  total_assets:
+    kind: instant
+    tags:
+      - Assets
+
+# Inputs to `derive`; not stored as facts.
+helpers:
+  cost_of_revenue:
+    kind: duration
+    tags:
+      - CostOfRevenue
+      - CostOfGoodsAndServicesSold
+      - CostOfGoodsAndServicesSoldExcludingDepreciationDepletionAndAmortization
+
+# Metrics each sector is expected to report (X-2). Banks report no gross profit or R&D.
+# The coverage check flags only gaps in these lists; the agent is told which metrics exist.
+sectors:
+  semiconductors: [revenue, gross_profit, rd_expense, operating_income, net_income, total_assets]
+  banks: [revenue, net_income, total_assets]
+  pharma: [revenue, gross_profit, rd_expense, net_income, total_assets]

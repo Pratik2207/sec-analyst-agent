@@ -1,0 +1,53 @@
+# The 50 v1 companies. `pilot: true` marks the 10 used in phases 1-5 (PRD section 11).
+# cik is the 10-digit zero-padded SEC Central Index Key.
+companies:
+  - {ticker: "NVDA", cik: "0001045810", name: "NVIDIA", sector: semiconductors, pilot: true}
+  - {ticker: "AMD", cik: "0000002488", name: "AMD", sector: semiconductors, pilot: true}
+  - {ticker: "INTC", cik: "0000050863", name: "Intel", sector: semiconductors, pilot: true}
+  - {ticker: "QCOM", cik: "0000804328", name: "Qualcomm", sector: semiconductors, pilot: true}
+  - {ticker: "AVGO", cik: "0001730168", name: "Broadcom", sector: semiconductors, pilot: false}
+  - {ticker: "TXN", cik: "0000097476", name: "Texas Instruments", sector: semiconductors, pilot: false}
+  - {ticker: "MU", cik: "0000723125", name: "Micron", sector: semiconductors, pilot: false}
+  - {ticker: "ADI", cik: "0000006281", name: "Analog Devices", sector: semiconductors, pilot: false}
+  - {ticker: "AMAT", cik: "0000006951", name: "Applied Materials", sector: semiconductors, pilot: false}
+  - {ticker: "LRCX", cik: "0000707549", name: "Lam Research", sector: semiconductors, pilot: false}
+  - {ticker: "KLAC", cik: "0000319201", name: "KLA", sector: semiconductors, pilot: false}
+  - {ticker: "MRVL", cik: "0001835632", name: "Marvell", sector: semiconductors, pilot: false}
+  - {ticker: "NXPI", cik: "0001413447", name: "NXP Semiconductors", sector: semiconductors, pilot: false}
+  - {ticker: "MCHP", cik: "0000827054", name: "Microchip Technology", sector: semiconductors, pilot: false}
+  - {ticker: "ON", cik: "0001097864", name: "onsemi", sector: semiconductors, pilot: false}
+  - {ticker: "MPWR", cik: "0001280452", name: "Monolithic Power Systems", sector: semiconductors, pilot: false}
+  - {ticker: "SWKS", cik: "0000004127", name: "Skyworks", sector: semiconductors, pilot: false}
+  - {ticker: "JPM", cik: "0000019617", name: "JPMorgan Chase", sector: banks, pilot: true}
+  - {ticker: "BAC", cik: "0000070858", name: "Bank of America", sector: banks, pilot: true}
+  - {ticker: "GS", cik: "0000886982", name: "Goldman Sachs", sector: banks, pilot: true}
+  - {ticker: "WFC", cik: "0000072971", name: "Wells Fargo", sector: banks, pilot: false}
+  - {ticker: "C", cik: "0000831001", name: "Citigroup", sector: banks, pilot: false}
+  - {ticker: "MS", cik: "0000895421", name: "Morgan Stanley", sector: banks, pilot: false}
+  - {ticker: "USB", cik: "0000036104", name: "U.S. Bancorp", sector: banks, pilot: false}
+  - {ticker: "PNC", cik: "0000713676", name: "PNC Financial", sector: banks, pilot: false}
+  - {ticker: "TFC", cik: "0000092230", name: "Truist Financial", sector: banks, pilot: false}
+  - {ticker: "COF", cik: "0000927628", name: "Capital One", sector: banks, pilot: false}
+  - {ticker: "BNY", cik: "0001390777", name: "BNY Mellon", sector: banks, pilot: false}
+  - {ticker: "STT", cik: "0000093751", name: "State Street", sector: banks, pilot: false}
+  - {ticker: "SCHW", cik: "0000316709", name: "Charles Schwab", sector: banks, pilot: false}
+  - {ticker: "FITB", cik: "0000035527", name: "Fifth Third Bancorp", sector: banks, pilot: false}
+  - {ticker: "MTB", cik: "0000036270", name: "M&T Bank", sector: banks, pilot: false}
+  - {ticker: "KEY", cik: "0000091576", name: "KeyCorp", sector: banks, pilot: false}
+  - {ticker: "RF", cik: "0001281761", name: "Regions Financial", sector: banks, pilot: false}
+  - {ticker: "PFE", cik: "0000078003", name: "Pfizer", sector: pharma, pilot: true}
+  - {ticker: "LLY", cik: "0000059478", name: "Eli Lilly", sector: pharma, pilot: true}
+  - {ticker: "MRK", cik: "0000310158", name: "Merck", sector: pharma, pilot: true}
+  - {ticker: "ABBV", cik: "0001551152", name: "AbbVie", sector: pharma, pilot: false}
+  - {ticker: "JNJ", cik: "0000200406", name: "Johnson & Johnson", sector: pharma, pilot: false}
+  - {ticker: "BMY", cik: "0000014272", name: "Bristol-Myers Squibb", sector: pharma, pilot: false}
+  - {ticker: "AMGN", cik: "0000318154", name: "Amgen", sector: pharma, pilot: false}
+  - {ticker: "GILD", cik: "0000882095", name: "Gilead Sciences", sector: pharma, pilot: false}
+  - {ticker: "REGN", cik: "0000872589", name: "Regeneron", sector: pharma, pilot: false}
+  - {ticker: "VRTX", cik: "0000875320", name: "Vertex Pharmaceuticals", sector: pharma, pilot: false}
+  - {ticker: "BIIB", cik: "0000875045", name: "Biogen", sector: pharma, pilot: false}
+  - {ticker: "ZTS", cik: "0001555280", name: "Zoetis", sector: pharma, pilot: false}
+  - {ticker: "MRNA", cik: "0001682852", name: "Moderna", sector: pharma, pilot: false}
+  - {ticker: "VTRS", cik: "0001792044", name: "Viatris", sector: pharma, pilot: false}
+  - {ticker: "INCY", cik: "0000879169", name: "Incyte", sector: pharma, pilot: false}
+  - {ticker: "ELAN", cik: "0001739104", name: "Elanco Animal Health", sector: pharma, pilot: false}
