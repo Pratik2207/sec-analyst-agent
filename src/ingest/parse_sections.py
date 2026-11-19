@@ -11,7 +11,7 @@ Output format (read only by src.ingest.chunker):
 Tables are Markdown; "title" is "" for the text before an Item's first subheading.
 
 How it works:
-1. The HTML is flattened into blocks: text paragraphs (with bold/italic/underline/font size)
+1. The HTML is flattened into blocks: text paragraphs (with bold/underline/font size)
    and tables. Layout tables (headings or bullets laid out in cells) become text blocks;
    data tables become Markdown (tables over MAX_TABLE_ROWS rows are dropped).
 2. Page furniture (page numbers, "Table of Contents", running page headers) is dropped.
@@ -78,7 +78,6 @@ class Block:
 @dataclass(frozen=True)
 class Style:
     bold: bool = False
-    italic: bool = False
     underline: bool = False
     size: float | None = None
 
@@ -88,11 +87,9 @@ def _norm(s: str) -> str:
 
 
 def _apply_style(tag: Tag, st: Style) -> Style:
-    bold, italic, underline, size = st.bold, st.italic, st.underline, st.size
+    bold, underline, size = st.bold, st.underline, st.size
     if tag.name in ("b", "strong", "h1", "h2", "h3", "h4", "h5", "h6"):
         bold = True
-    elif tag.name in ("i", "em"):
-        italic = True
     elif tag.name == "u":
         underline = True
     css = (tag.get("style") or "").lower()
@@ -100,13 +97,11 @@ def _apply_style(tag: Tag, st: Style) -> Style:
         if m := re.search(r"font-weight:\s*(\w+)", css):
             w = m.group(1)
             bold = w in ("bold", "bolder") or (w.isdigit() and int(w) >= 600)
-        if m := re.search(r"font-style:\s*(\w+)", css):
-            italic = m.group(1) in ("italic", "oblique")
         if m := re.search(r"text-decoration[\w-]*:\s*([^;]+)", css):
             underline = "underline" in m.group(1)
         if m := re.search(r"font-size:\s*([\d.]+)\s*(pt|px)", css):
             size = float(m.group(1)) * (0.75 if m.group(2) == "px" else 1.0)
-    return Style(bold, italic, underline, size)
+    return Style(bold, underline, size)
 
 
 def _hidden(tag: Tag) -> bool:

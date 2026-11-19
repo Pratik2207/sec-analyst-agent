@@ -1,0 +1,12 @@
+<html>
+<head><meta charset="utf-8"><title>Malformed 10-K without Item headings (synthetic test fixture)</title></head>
+<body>
+<div><span style="font-weight:700">ANNUAL REPORT</span></div>
+<div><span>Oddco Inc. makes gadgets. This filing has lost its Item headings, so the parser cannot find Items 1, 1A or 7 and must fall back to the whole document.</span></div>
+<div><span style="font-weight:700">Our Products</span></div>
+<div><span>Oddco sells three gadget lines to retailers in North America. Revenue grew 5% in 2024 to $80 million.</span>
+<p>Unclosed paragraph with <b>bold words</b> and a stray <span>span
+<div><span style="font-weight:700">Risks</span></div>
+<div><span>Gadget demand is seasonal and depends on consumer spending.</span></div>
+</body>
+</html>
