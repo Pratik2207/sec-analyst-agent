@@ -89,8 +89,9 @@ Tracks: single. This phase creates the folder layout that later tracks own.
 ## Phase 2: Text pipeline  [status: planned]
 Goal: Turn the pilot 10-Ks into section-aware chunks in Qdrant, searchable with hybrid search and reranking.
 Requirements: FR-1, FR-4, FR-5, FR-6, NFR-8, X-4
-Deliverables: `src/ingest/{download_filings,parse_sections,chunker,index_qdrant}.py`, `src/retrieval/{hybrid_search,reranker}.py`, `scripts/retrieval_check.py`, plus 20 manual retrieval questions in `evals/retrieval_check.jsonl`.
+Deliverables: `src/ingest/{download_filings,parse_sections,chunker,index_qdrant}.py`, `src/retrieval/{hybrid_search,reranker}.py`, `scripts/retrieval_check.py`, plus 20 manual retrieval questions in `evals/retrieval_check.jsonl`; a Qdrant healthcheck in `docker-compose.yml` (added after Phase 1 review).
 Acceptance criteria:
+0. `docker compose ps` shows Qdrant `(healthy)` via a compose healthcheck on `/readyz`.
 1. The pilot set (about 30 filings) downloads into `data/raw/`. A re-run makes 0 network requests.
 2. For each filing, Items 1, 1A and 7 are found, or the fallback runs and is logged. Risk Factors give one chunk per risk.
 3. Every chunk has the context header, at most 800 tokens, about 15% overlap on splits, and the payload from PRD §7.2. MD&A tables become Markdown chunks.
@@ -108,7 +109,7 @@ Tracks: parallel
   - The point ID is `uuid5(NAMESPACE, f"{accession_no}|{item}|{chunk_index}")`.
   - track-a: download_filings, parse_sections and chunker, which write the chunk JSONL; owns: `src/ingest/download_filings.py`, `src/ingest/parse_sections.py`, `src/ingest/chunker.py`, `tests/ingest_text/`
   - track-b: index_qdrant, hybrid search and the reranker, which read the chunk JSONL and are tested with fixture chunks; owns: `src/ingest/index_qdrant.py`, `src/retrieval/`, `tests/retrieval/`
-  - After the merge (main session): `scripts/retrieval_check.py` and the 20-question check.
+  - After the merge (main session): `scripts/retrieval_check.py`, the 20-question check, and the Qdrant compose healthcheck (`docker-compose.yml` is owned by main, not a track).
 
 ## Phase 3: Tools, fast path, naive baseline  [status: planned]
 Goal: Build all five agent tools, a working fast path for simple questions, and the naive RAG baseline.

@@ -1,8 +1,10 @@
 # XBRL us-gaap tag -> canonical metric (FR-3).
 # For each metric, tags are tried in order; the first tag reported in the 10-K for that
 # fiscal year wins. `kind` is duration (a full fiscal year) or instant (balance at period end).
-# `derive` is used only when none of the tags is reported: value = a - b, where a and b are
-# canonical metrics or helpers. The stored xbrl_tag is then "derived:<tag_a>-<tag_b>".
+# `derive` is used only when none of the tags is reported: value = a <op> b, where a and b are
+# canonical metrics or helpers and op is "-" or "+". The stored xbrl_tag is then
+# "derived:<tag_a><op><tag_b>". If b is listed in `optional` and not reported, it counts as 0
+# and the tag reads "derived:<tag_a><op>none".
 metrics:
   revenue:
     kind: duration
@@ -16,13 +18,16 @@ metrics:
     kind: duration
     tags:
       - GrossProfit
-    derive: [revenue, cost_of_revenue]
+    derive: {op: "-", args: [revenue, cost_of_revenue]}
+  # One definition for every company: total R&D expense INCLUDING acquired in-process R&D
+  # (IPR&D), as on the income statement. Filers that report R&D excluding IPR&D get the
+  # separately tagged IPR&D charge added back. (Excluding IPR&D can't be applied consistently:
+  # some filers, e.g. Merck FY2023, don't tag the IPR&D charge in us-gaap.)
   rd_expense:
     kind: duration
     tags:
       - ResearchAndDevelopmentExpense
-      - ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost
-      - ResearchAndDevelopmentExpenseSoftwareExcludingAcquiredInProcessCost
+    derive: {op: "+", args: [rd_excluding_ipr_d, acquired_ipr_d], optional: [acquired_ipr_d]}
   operating_income:
     kind: duration
     tags:
@@ -45,6 +50,15 @@ helpers:
       - CostOfRevenue
       - CostOfGoodsAndServicesSold
       - CostOfGoodsAndServicesSoldExcludingDepreciationDepletionAndAmortization
+  rd_excluding_ipr_d:
+    kind: duration
+    tags:
+      - ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost
+      - ResearchAndDevelopmentExpenseSoftwareExcludingAcquiredInProcessCost
+  acquired_ipr_d:
+    kind: duration
+    tags:
+      - ResearchAndDevelopmentAssetAcquiredOtherThanThroughBusinessCombinationWrittenOff
 
 # Metrics each sector is expected to report (X-2). Banks report no gross profit or R&D.
 # The coverage check flags only gaps in these lists; the agent is told which metrics exist.

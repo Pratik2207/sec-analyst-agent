@@ -101,6 +101,23 @@ def _first_tag(facts_json: dict, spec: dict, filing: Filing) -> tuple[str, float
     return None
 
 
+def _derive(facts_json: dict, derive: dict, metrics: dict, helpers: dict,
+            filing: Filing) -> tuple[str, float] | None:
+    """value = a <op> b; an `optional` b that isn't reported counts as 0."""
+    op = derive["op"]
+    if op not in ("-", "+"):
+        raise ValueError(f"unsupported derive op {op!r}")
+    a_name, b_name = derive["args"]
+    a = _first_tag(facts_json, metrics.get(a_name) or helpers[a_name], filing)
+    b = _first_tag(facts_json, metrics.get(b_name) or helpers[b_name], filing)
+    if b is None and b_name in derive.get("optional", []):
+        b = ("none", 0.0)
+    if a is None or b is None:
+        return None
+    value = a[1] - b[1] if op == "-" else a[1] + b[1]
+    return f"derived:{a[0]}{op}{b[0]}", value
+
+
 def extract_metrics(facts_json: dict, ticker: str, metric_map: dict,
                     years: tuple[int, ...] = FISCAL_YEARS) -> list[FactRow]:
     metrics, helpers = metric_map["metrics"], metric_map.get("helpers", {})
@@ -113,11 +130,7 @@ def extract_metrics(facts_json: dict, ticker: str, metric_map: dict,
         for metric, spec in metrics.items():
             found = _first_tag(facts_json, spec, filing)
             if found is None and "derive" in spec:
-                a_name, b_name = spec["derive"]
-                a = _first_tag(facts_json, metrics.get(a_name) or helpers[a_name], filing)
-                b = _first_tag(facts_json, metrics.get(b_name) or helpers[b_name], filing)
-                if a and b:
-                    found = (f"derived:{a[0]}-{b[0]}", a[1] - b[1])
+                found = _derive(facts_json, spec["derive"], metrics, helpers, filing)
             if found is None:
                 continue
             tag, value = found

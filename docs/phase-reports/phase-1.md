@@ -48,7 +48,21 @@ Loaded data: 10 companies and 144 facts. Spot checks match the published 10-K nu
 - Postgres and Qdrant ports are bound to loopback only. The security reviewer flagged that they were published on all interfaces, and Qdrant has no API key. IPv6 `[::1]` is bound too, because `localhost` on Windows otherwise waited 20 s per connection.
 - The FR-8 "the role itself refuses writes" gap from code review was closed by the tester's autocommit test.
 
-## Open medium/low items (not fixed; your call)
+## Follow-up after user review (2026-11-19)
+The user decided:
+1. **DB failure on `/ask`:** keep "Not found in the filings." (no change).
+2. **One R&D definition: total R&D including acquired IPR&D.**
+   - If `ResearchAndDevelopmentExpense` is reported, it's used. Otherwise the value is `…ExcludingAcquiredInProcessCost` plus `…AssetAcquiredOtherThanThroughBusinessCombinationWrittenOff`, with IPR&D counted as 0 if untagged.
+   - LLY FY2023 is now $13.11B (it was $9.31B) and PFE FY2023 is $10.87B (it was $10.68B). MRK and the semiconductor companies are unchanged.
+   - "Excluding IPR&D" was rejected because Merck doesn't tag its FY2023 Prometheus charge in us-gaap.
+   - `derive` now supports `+`/`-` and optional operands. The `metric_map` table now drops tags that are no longer in config.
+3. **Qdrant compose healthcheck:** added to the Phase 2 plan (deliverables and AC 0).
+4. **Reader-role hardening:** done. `ensure_reader_role` refuses the owner role and any role with superuser, createrole, createdb, replication or bypassrls rights.
+5. **Ollama pin:** done (`ollama>=0.5`).
+
+Tests: 133 passed (5 R&D-definition unit tests and 4 hardening/sync integration tests added).
+
+## Open medium/low items (original list; 1, 2 and 4 resolved above)
 1. **(medium) A DB outage looks like "not found".** If Postgres is down or a password is wrong, `/ask` returns 200 with "Not found in the filings." instead of a 503 (`src/api/main.py`). This is worth fixing when Phase 3/4 rework `/ask`.
 2. **(low) Mixed R&D definitions.** `ResearchAndDevelopmentExpense` is tried first, so MRK's figure includes acquired IPR&D (FY2023: $30.5B), while PFE and LLY fall back to the excluding-IPR&D tag. This is a data-definition decision: prefer one definition, or document it.
 3. **(low) The `accession_no` rule is checked after the query runs, by column name only.** An alias like `ticker AS accession_no` passes it. It's a citation rule, not a security control. It also rejects aggregates over `financial_facts`, which is fine because the PRD wants math in `calculate`.

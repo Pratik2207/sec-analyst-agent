@@ -24,7 +24,7 @@ def apply_schema(conn: psycopg.Connection) -> None:
 
 
 def load_metric_map_table(conn: psycopg.Connection) -> int:
-    """Upsert every tag in config/metric_map.yaml (metrics only, not helpers)."""
+    """Make the table match config/metric_map.yaml (metrics only, not helpers)."""
     rows = []
     seen: dict[str, str] = {}
     for metric, spec in load_metric_map()["metrics"].items():
@@ -39,17 +39,31 @@ def load_metric_map_table(conn: psycopg.Connection) -> int:
             "ON CONFLICT (xbrl_tag) DO UPDATE SET metric = EXCLUDED.metric",
             rows,
         )
+        cur.execute("DELETE FROM metric_map WHERE NOT (xbrl_tag = ANY(%s))", (list(seen),))
     return len(rows)
 
 
 def ensure_reader_role(conn: psycopg.Connection, reader_url: str | None = None) -> None:
-    """Create/refresh the SELECT-only role named in AGENT_DATABASE_URL."""
+    """Create/refresh the SELECT-only role named in AGENT_DATABASE_URL.
+
+    Refuses to touch the connecting (owner) role or any role with superuser, create-role,
+    create-db or replication rights: making those "read-only by default" would not
+    actually stop writes, and would silently weaken the agent's SQL sandbox.
+    """
     info = conninfo_to_dict(reader_url or get_settings().agent_database_url)
     role, password = info["user"], info.get("password")
     if not password:
         raise ValueError("AGENT_DATABASE_URL must include a password")
+    if role == conn.info.user:
+        raise ValueError("AGENT_DATABASE_URL must use a different role than DATABASE_URL")
     dbname = conn.info.dbname
-    exists = conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,)).fetchone()
+    exists = conn.execute(
+        "SELECT rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls "
+        "FROM pg_roles WHERE rolname = %s",
+        (role,),
+    ).fetchone()
+    if exists and exists[0]:
+        raise ValueError(f"role {role!r} has elevated privileges; refusing to use it as reader")
     verb = "ALTER" if exists else "CREATE"
     ident = sql.Identifier(role)
     conn.execute(sql.SQL(verb + " ROLE {} LOGIN PASSWORD {}").format(ident, sql.Literal(password)))
