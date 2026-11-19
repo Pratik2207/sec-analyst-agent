@@ -1,0 +1,27 @@
+{"q": "What was Intel's R&D in FY2024?", "kind": "fast", "ticker": "INTC", "metric": "rd_expense", "fiscal_year": 2024}
+{"q": "NVIDIA revenue fiscal 2025", "kind": "fast", "ticker": "NVDA", "metric": "revenue", "fiscal_year": 2025}
+{"q": "JPMorgan total assets 2023", "kind": "fast", "ticker": "JPM", "metric": "total_assets", "fiscal_year": 2023}
+{"q": "What was Pfizer's net income in FY2024?", "kind": "fast", "ticker": "PFE", "metric": "net_income", "fiscal_year": 2024}
+{"q": "How much revenue did AMD report in 2023?", "kind": "fast", "ticker": "AMD", "metric": "revenue", "fiscal_year": 2023}
+{"q": "What was Qualcomm's operating income for fiscal year 2024?", "kind": "fast", "ticker": "QCOM", "metric": "operating_income", "fiscal_year": 2024}
+{"q": "Merck research and development expense FY2025", "kind": "fast", "ticker": "MRK", "metric": "rd_expense", "fiscal_year": 2025}
+{"q": "What was Eli Lilly's gross profit in 2024?", "kind": "fast", "ticker": "LLY", "metric": "gross_profit", "fiscal_year": 2024}
+{"q": "Goldman Sachs net income FY2023", "kind": "fast", "ticker": "GS", "metric": "net_income", "fiscal_year": 2023}
+{"q": "What were Bank of America's total assets at the end of fiscal 2025?", "kind": "fast", "ticker": "BAC", "metric": "total_assets", "fiscal_year": 2025}
+{"q": "INTC net income 2024", "kind": "fast", "ticker": "INTC", "metric": "net_income", "fiscal_year": 2024}
+{"q": "What were NVDA's sales in FY24?", "kind": "fast", "ticker": "NVDA", "metric": "revenue", "fiscal_year": 2024}
+{"q": "What was the R&D expense of Qualcomm in fiscal 2023?", "kind": "fast", "ticker": "QCOM", "metric": "rd_expense", "fiscal_year": 2023}
+{"q": "Which semiconductor companies raised R&D as a share of revenue while gross margin fell, FY2024 to FY2025?", "kind": "agent"}
+{"q": "Why did AMD's gross margin fall?", "kind": "agent"}
+{"q": "Compare NVDA and AMD revenue in 2024", "kind": "agent"}
+{"q": "Which bank had the highest net income in 2025?", "kind": "agent"}
+{"q": "How did Lilly's revenue grow from 2023 to 2025?", "kind": "agent"}
+{"q": "What was the R&D expense of Intel in 2024 and 2025?", "kind": "agent"}
+{"q": "Revenue of AMD?", "kind": "agent"}
+{"q": "What are the main risk factors Intel described in its FY2024 10-K?", "kind": "agent", "llm": true}
+{"q": "What was NVIDIA's gross margin percentage in FY2025?", "kind": "agent"}
+{"q": "What was Apple's revenue in 2024?", "kind": "agent"}
+{"q": "What were Intel's revenue and net income in FY2024?", "kind": "agent"}
+{"q": "Explain Pfizer's revenue decline in 2024", "kind": "agent"}
+{"q": "What was JPMorgan's earnings per share in 2024?", "kind": "agent", "llm": true}
+{"q": "What did Merck say about Keytruda patent expiry in its 2025 annual report?", "kind": "agent", "llm": true}
