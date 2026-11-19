@@ -32,7 +32,9 @@ def chat_json(model: str, system: str, user: str, schema: dict,
         resp = ollama.Client(host=s.ollama_host).chat(
             model=model,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            format=schema, think=think, options={"temperature": 0}, keep_alive=KEEP_ALIVE)
+            format=schema, think=think,
+            # Ollama defaults to a 4096-token context; multi-hop evidence + feedback exceeds it.
+            options={"temperature": 0, "num_ctx": s.llm_num_ctx}, keep_alive=KEEP_ALIVE)
     except (ollama.ResponseError, ollama.RequestError, httpx.HTTPError, ConnectionError) as e:
         raise LLMError(f"{model}: {type(e).__name__}: {e}") from e
     tokens = Tokens(prompt=resp.prompt_eval_count or 0, completion=resp.eval_count or 0)

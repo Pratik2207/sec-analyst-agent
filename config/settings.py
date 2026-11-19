@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     planner_model: str = "qwen3:4b-instruct"
     planner_think: bool = False
     grader_model: str = "qwen3:1.7b"
+    llm_num_ctx: int = 8192   # agent LLM calls (Ollama default 4096 is too small for evidence)
 
 
 @lru_cache
