@@ -43,23 +43,35 @@ MAX_CLAIMS = 6
 _MARKER = re.compile(r"\s*\[\d+(?:\s*[,\-–]\s*\d+)*\]")
 
 
-def _schema(ids: list[str]) -> dict:
-    return {
+# "Which/who" questions select companies: the answer must state the selection (or "none").
+# Live, the 4B model sometimes listed every company's numbers but never the conclusion, so
+# for these questions the schema REQUIRES a direct answer. It is named "answer" so it sorts
+# first: Ollama emits properties alphabetically, so the model writes the conclusion first.
+_SELECTION = re.compile(r"\b(which|who|whom|whose)\b|\bwhat (?:companies|banks|firms)\b", re.I)
+
+
+def is_selection(question: str) -> bool:
+    return bool(_SELECTION.search(question))
+
+
+def _schema(ids: list[str], selection: bool = False) -> dict:
+    claim = {
         "type": "object",
         "properties": {
-            "not_found": {"type": "boolean"},
-            "claims": {"type": "array", "maxItems": MAX_CLAIMS, "items": {
-                "type": "object",
-                "properties": {
-                    "text": {"type": "string"},
-                    "source_ids": {"type": "array", "minItems": 1,
-                                   "items": {"type": "string", "enum": ids}},
-                },
-                "required": ["text", "source_ids"],
-            }},
+            "text": {"type": "string"},
+            "source_ids": {"type": "array", "minItems": 1,
+                           "items": {"type": "string", "enum": ids}},
         },
-        "required": ["not_found", "claims"],
+        "required": ["text", "source_ids"],
     }
+    props = {"not_found": {"type": "boolean"},
+             "claims": {"type": "array", "maxItems": MAX_CLAIMS, "items": claim}}
+    required = ["not_found", "claims"]
+    if selection:
+        props["answer"] = {**claim, "description": "one sentence naming the companies that "
+                           "meet every condition, or saying that none of them do"}
+        required.insert(0, "answer")
+    return {"type": "object", "properties": props, "required": required}
 
 
 def build_user(question: str, evidence: str, feedback: str | None = None) -> str:
@@ -126,9 +138,15 @@ def answer(question: str, tool_results: list[ToolResult],
     ids = list(dict.fromkeys(it.source_id for it in items if it.source_id))
     user = build_user(question, render_evidence(items), feedback)
     # LLMError propagates: the graph flags "answer writer failed" and keeps verified claims
+    selection = is_selection(question)
     raw, tokens = llm.chat_json(get_settings().answer_model, SYSTEM_PROMPT, user,
-                                _schema(ids), think=False)
+                                _schema(ids, selection), think=False)
     if not isinstance(raw, dict) or raw.get("not_found") is True:
         return Draft(not_found=True), tokens
+    if selection and isinstance(raw.get("answer"), dict):   # the direct answer goes first
+        direct = raw["answer"]
+        rest = [c for c in raw.get("claims") or []
+                if not (isinstance(c, dict) and c.get("text") == direct.get("text"))]
+        raw = {**raw, "claims": [direct, *rest]}
     claims = _claims(raw, set(ids), tool_results)
     return Draft(claims=claims, not_found=not claims), tokens

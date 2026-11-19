@@ -82,3 +82,8 @@ def test_only_change_calcs_constrain_direction():
 def test_uncited_change_calc_still_constrains():
     # the model often cites the facts rather than the calc; the check uses the company's calcs
     assert not _ok("NVDA's R&D share was higher.", ids=("calc:4",))[0]
+
+
+def test_more_direction_words():
+    assert not _ok("NVDA's R&D as a share of revenue climbed.")[0]
+    assert not _ok("NVIDIA's gross margin dipped in FY2025.")[0]

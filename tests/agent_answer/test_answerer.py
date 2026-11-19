@@ -165,3 +165,21 @@ def test_citations_repaired_from_the_named_companys_items(stub):
         ["calc:17", "calc:1", "calc:3"], ["calc:17"], ["calc:17"]]
     vr = verify(draft, results)
     assert vr.ok_claims == draft.claims[:1] and len(vr.failed_claims) == 2
+
+
+def test_selection_question_requires_and_leads_with_direct_answer(stub):
+    s = stub({"answer": {"text": "None of the companies did.", "source_ids": [NVDA_FY25_XBRL]},
+              "not_found": False,
+              "claims": [{"text": "NVIDIA revenue was $130.50 billion.",
+                          "source_ids": [NVDA_FY25_XBRL]}]})
+    draft, _ = answerer.answer("Which chip companies raised revenue?", EVIDENCE)
+    assert [c.text for c in draft.claims][0] == "None of the companies did."
+    schema = s.calls[-1]["schema"]
+    assert "answer" in schema["required"]
+
+
+def test_non_selection_question_has_no_direct_answer_field():
+    from src.agent.answerer import _schema, is_selection
+    assert not is_selection("Why did AMD's gross margin fall?")
+    assert is_selection("Which bank had the highest net income?")
+    assert "answer" not in _schema(["x"])["properties"]

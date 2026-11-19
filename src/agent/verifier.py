@@ -108,10 +108,12 @@ def stated_in(text: str, source_ids: list[str], tool_results: list[ToolResult],
 # bare "up"/"down" only when followed by by/from/a number ("made up half" is not a rise)
 _MOVED = r"(?:went|gone|go|goes|going|moved|was|were|is|are|been)\s+"
 _UP = re.compile(r"\b(rais\w*|increas\w*|rose|rise[sn]?|grew|grow\w*|higher|expand\w*|"
-                 r"improv\w*|" + _MOVED + r"up|up(?=\s+(?:by|from|\d|\$)))\b", re.I)
+                 r"improv\w*|climb\w*|jump\w*|surg\w*|soar\w*|" + _MOVED
+                 + r"up|up(?=\s+(?:by|from|\d|\$)))\b", re.I)
 _DOWN = re.compile(r"\b(fell|fall\w*|decreas\w*|declin\w*|lower\w*|drop\w*|" + _MOVED
                    + r"down|down(?=\s+(?:by|from|\d|\$))|shr[ai]nk\w*|contract\w*|"
-                   r"reduc\w*)\b", re.I)
+                   r"reduc\w*|dipp?\w*|slid\w*|slipp?\w*|plung\w*|tumbl\w*|sank|sunk)\b",
+                   re.I)
 # "did not raise" states the opposite direction; negated clauses are not checked
 _NEGATION = re.compile(r"\b(not|n't|never|no longer|neither|nor|none)\b|n't\b", re.I)
 # comparisons between companies ("raised it more than INTC") state a relation, not each
