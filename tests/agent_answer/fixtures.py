@@ -77,5 +77,28 @@ MULTIHOP_QUESTION = ("Which semiconductor companies raised R&D as a share of rev
                      "gross margin fell, FY2024 to FY2025?")
 
 
+def changes(tickers=tuple(FILINGS), start: int = 17) -> ToolResult:
+    """Per ticker: rd_share_change and gross_margin_change (FY2025 minus FY2024, in points)."""
+    data, sources = [], []
+    n = start
+    for t in tickers:
+        (a24, _, rev24, rd24, gp24), (a25, _, rev25, rd25, gp25) = (FILINGS[t][2024],
+                                                                   FILINGS[t][2025])
+        for name, var, v24, v25 in (("rd_share_change", "rd_expense", rd24, rd25),
+                                    ("gross_margin_change", "gross_profit", gp24, gp25)):
+            sid = f"calc:{n}"
+            data.append({"source_id": sid, "ticker": t, "name": name,
+                         "expression": f"{var}_2025 / revenue_2025 * 100 - "
+                                       f"{var}_2024 / revenue_2024 * 100",
+                         "values": {f"{var}_2025": v25, "revenue_2025": rev25,
+                                    f"{var}_2024": v24, "revenue_2024": rev24},
+                         "result": v25 / rev25 * 100 - v24 / rev24 * 100,
+                         "input_source_ids": [f"xbrl:{a25}", f"xbrl:{a24}"]})
+            sources.append(Source(source_id=sid, kind="calc"))
+            n += 1
+    return ToolResult(ok=True, data=data, sources=sources)
+
+
 def multihop() -> list[ToolResult]:
-    return [facts(), calcs()]
+    """What the plan for MULTIHOP_QUESTION yields: facts, ratios per year, and changes."""
+    return [facts(), calcs(), changes()]

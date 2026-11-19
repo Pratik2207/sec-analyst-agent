@@ -4,7 +4,7 @@ import pytest
 
 from src.agent.state import Claim, Draft
 from src.agent.verifier import checked_numbers, feedback_text, verify
-from tests.agent_answer.fixtures import NVDA_FY25_XBRL, NVDA_GM_CHUNK, calcs, facts
+from tests.agent_answer.fixtures import NVDA_FY25_XBRL, NVDA_GM_CHUNK, calcs, changes, facts
 
 RESULTS = [facts(), calcs(), NVDA_GM_CHUNK]
 # calcs() numbering: NVDA calc:1..4 (rd_share_2024, gross_margin_2024, rd_share_2025,
@@ -89,6 +89,17 @@ def test_numbers_from_chunk_text():
 def test_any_cited_source_may_hold_the_number():
     text = "NVIDIA's gross margin was 75.0% on revenue of $130.50 billion in FY2025."
     assert one(text, "chunk:7f1c2e9a", NVDA_FY25_XBRL).ok_claims
+
+
+def test_reason_points_to_items_that_state_the_number():
+    # The live 4B model cited the change calc but stated the per-year ratios.
+    results = [facts(), calcs(), changes()]
+    claim = Claim(text="NVDA's R&D share fell from 14.24% to 9.90%.", source_ids=["calc:17"])
+    (_, reason), = verify(Draft(claims=[claim]), results).failed_claims
+    assert reason.startswith("14.24, 9.9 not found in cited calc:17 (has -4.3435, ")
+    assert reason.endswith("; stated in calc:1, calc:3")
+    fixed = Claim(text=claim.text, source_ids=["calc:17", "calc:1", "calc:3"])
+    assert verify(Draft(claims=[fixed]), results).ok_claims == [fixed]
 
 
 def test_unknown_id_fails():

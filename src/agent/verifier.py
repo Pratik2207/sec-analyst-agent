@@ -86,8 +86,15 @@ def _check(claim: Claim, items: dict[str, list[dict]], known: set[str]) -> str |
         return None
     has = ", ".join(_fmt(v) for v in list(dict.fromkeys(pool))[:5]) or "no numbers"
     more = ", ..." if len(set(pool)) > 5 else ""
-    return (f"{', '.join(_fmt(n) for n in bad)} not found in cited "
-            f"{', '.join(claim.source_ids)} (has {has}{more})")
+    reason = (f"{', '.join(_fmt(n) for n in bad)} not found in cited "
+              f"{', '.join(claim.source_ids)} (has {has}{more})")
+    # Point the re-answer at the items that do state these numbers (calc inputs not expanded,
+    # so a ratio points to its calc and a raw value to its filing).
+    elsewhere = [sid for sid in items if sid not in claim.source_ids
+                 and any(number_matches(n, v) for n in bad for v in _pool(sid, items, depth=3))]
+    if elsewhere:
+        reason += f"; stated in {', '.join(elsewhere[:4])}"
+    return reason
 
 
 def verify(draft: Draft, tool_results: list[ToolResult]) -> VerifyResult:

@@ -71,7 +71,7 @@ def test_feedback_is_included(stub):
     fb = '- "Revenue was $140 billion." (cited xbrl:x): 140000000000 not found'
     answerer.answer("q", EVIDENCE, feedback=fb)
     user = s.calls[0]["user"]
-    assert fb in user and "failed verification" in user and "or drop it" in user
+    assert fb in user and "failed verification" in user and "or drop the claim" in user
 
 
 def test_unknown_ids_dropped_and_claims_without_ids_dropped(stub):
@@ -121,3 +121,20 @@ def test_at_most_six_claims(stub):
         {"text": f"Claim {i}.", "source_ids": [NVDA_FY25_XBRL]} for i in range(9)]})
     draft, _ = answerer.answer("q", EVIDENCE)
     assert len(draft.claims) == 6
+
+
+def test_ids_about_other_companies_are_dropped(stub):
+    # calc:1..4 are NVDA, calc:5..8 AMD, calc:9..12 INTC (see fixtures).
+    stub({"not_found": False, "claims": [
+        {"text": "Intel's R&D share rose to 33.67% in FY2025.",
+         "source_ids": ["calc:11", "calc:3"]},
+        {"text": "NVDA's R&D share fell.", "source_ids": ["calc:9"]},
+        {"text": "Only one company qualified.", "source_ids": ["calc:1", "calc:9"]},
+        {"text": "INTC and NVIDIA both filed 10-Ks.",
+         "source_ids": ["calc:1", "calc:9", "calc:5"]}]})
+    draft, _ = answerer.answer("q", [facts(), calcs()])
+    assert [c.source_ids for c in draft.claims] == [
+        ["calc:11"],             # NVDA calc dropped from the Intel claim
+        # the NVDA claim citing only an INTC calc is dropped entirely
+        ["calc:1", "calc:9"],    # names no company: left alone
+        ["calc:1", "calc:9"]]    # AMD calc dropped
