@@ -111,6 +111,6 @@ class LangfuseTracer:
 
 
 def create_tracer(host: str, public_key: str, secret_key: str) -> LangfuseTracer:
-    from langfuse import Langfuse   # imported only when tracing is configured
+    from langfuse import Langfuse  # imported only when tracing is configured
 
     return LangfuseTracer(Langfuse(public_key=public_key, secret_key=secret_key, host=host))
