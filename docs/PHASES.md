@@ -130,7 +130,7 @@ Tracks: parallel
   - track-c: router and fast path; owns: `src/agent/router.py`, `src/agent/fast_path.py`, `tests/agent_fast/`
   - After the merge: wire `/ask` to the router.
 
-## Phase 4: Agent loop  [status: planned]
+## Phase 4: Agent loop  [status: in progress]
 Goal: Build the LangGraph agent that plans, calls tools, grades, answers with citations and verifies them, and say "not found" when evidence is missing.
 Requirements: FR-7, FR-10, FR-11, FR-12, FR-13, FR-14, NFR-7
 Deliverables: `src/agent/{graph,state,planner,grader,answerer,verifier}.py`, `src/agent/prompts/`; `/ask` returns the full `AskResponse` (answer, citations, steps, tokens, latency_ms).

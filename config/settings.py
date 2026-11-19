@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     answer_model: str = "qwen3:4b-instruct"
     baseline_k: int = 8
 
+    # Phase 4: planner (whole plan in one structured-output call). PRD 5.1 wants thinking on
+    # for the planner; the thinking build ("qwen3:4b") is much slower on this GPU, so the
+    # default is decided by measurement in Phase 4 (see the phase report).
+    planner_model: str = "qwen3:4b-instruct"
+    planner_think: bool = False
+    grader_model: str = "qwen3:1.7b"
+
 
 @lru_cache
 def get_settings() -> Settings:

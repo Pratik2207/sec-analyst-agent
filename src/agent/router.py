@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Literal
 
+import httpx
 import ollama
 
 from config.settings import get_settings, load_companies, load_metric_map
@@ -208,7 +209,8 @@ def route(question: str) -> Route:
         return Route(kind="agent", reason=reason)
     try:
         q, tokens = extract(question)
-    except (ollama.ResponseError, json.JSONDecodeError, ConnectionError) as e:
+    except (ollama.ResponseError, ollama.RequestError, httpx.HTTPError, json.JSONDecodeError,
+            ConnectionError) as e:   # any LLM failure: send the question to the agent
         return Route(kind="agent", reason=f"extraction failed: {type(e).__name__}")
     ticker, metric, year = q.get("ticker"), q.get("metric"), q.get("fiscal_year")
     if metric not in load_metric_map()["metrics"]:
