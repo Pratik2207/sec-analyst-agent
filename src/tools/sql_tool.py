@@ -13,19 +13,33 @@ import psycopg
 import sqlglot
 from sqlglot import exp
 
-from config.settings import get_settings
+from config.settings import get_settings, load_metric_map
 
 MAX_ROWS = 200
 
-DESCRIPTION = """Run ONE read-only PostgreSQL SELECT. Tables:
+
+def _build_description() -> str:
+    """Tool description for the agent; metric and sector lists come from metric_map.yaml (X-2)."""
+    mm = load_metric_map()
+    metrics = list(mm["metrics"])
+    sector_lines = "\n".join(
+        f"  Sector {sector} reports: {', '.join(m for m in metrics if m in expected)}"
+        + (f" (no {', '.join(m for m in metrics if m not in expected)})"
+           if set(metrics) - set(expected) else "")
+        for sector, expected in mm["sectors"].items()
+    )
+    return f"""Run ONE read-only PostgreSQL SELECT. Tables:
 companies(ticker, cik, name, sector, fy_end_month)
 financial_facts(ticker, fiscal_year, period_end, metric, value, unit, xbrl_tag, accession_no)
-  metric is one of: revenue, gross_profit, rd_expense, operating_income, net_income, total_assets
-  Banks have no gross_profit, rd_expense or operating_income.
+  metric is one of: {', '.join(metrics)}
+{sector_lines}
 Always SELECT accession_no from financial_facts so results can be cited. Do math with the
 calculate tool, not in SQL.
 Example: SELECT ticker, fiscal_year, value, accession_no FROM financial_facts
   WHERE metric = 'rd_expense' AND ticker = 'INTC' AND fiscal_year = 2024"""
+
+
+DESCRIPTION = _build_description()
 
 _FORBIDDEN = (exp.Insert, exp.Update, exp.Delete, exp.Merge, exp.Create, exp.Drop, exp.Alter,
               exp.Command, exp.Into, exp.Lock, exp.Set, exp.Transaction, exp.Commit,

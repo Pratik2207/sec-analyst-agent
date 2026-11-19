@@ -58,10 +58,11 @@ def extract_query(question: str, companies: list[dict], metrics: list[str]) -> t
 
 
 def format_usd(value: float) -> str:
+    sign, value = ("-" if value < 0 else ""), abs(value)
     for size, suffix in ((1e9, "billion"), (1e6, "million")):
-        if abs(value) >= size:
-            return f"${value / size:,.2f} {suffix}"
-    return f"${value:,.0f}"
+        if value >= size:
+            return f"{sign}${value / size:,.2f} {suffix}"
+    return f"{sign}${value:,.0f}"
 
 
 @app.get("/health")
