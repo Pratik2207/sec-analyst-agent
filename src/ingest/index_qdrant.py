@@ -7,13 +7,84 @@ ticker, sector, fiscal_year, item. Point IDs: chunk_schema.point_id(...).
 Usage: uv run python -m src.ingest.index_qdrant
 """
 
+import time
 from pathlib import Path
+
+from qdrant_client import QdrantClient, models
+
+from config.settings import get_settings
+from src.ingest.chunk_schema import CHUNKS_DIR, point_id, read_chunks
+from src.retrieval.models import dense_model, qdrant, sparse_model
+
+BATCH = 64
+KEYWORD_FIELDS = ("ticker", "sector", "item")
+INTEGER_FIELDS = ("fiscal_year",)
+
+
+def ensure_collection(client: QdrantClient, name: str) -> None:
+    """Create the collection and its payload indexes if missing."""
+    if client.collection_exists(name):
+        return
+    client.create_collection(
+        name,
+        vectors_config={"dense": models.VectorParams(
+            size=get_settings().embed_dim, distance=models.Distance.COSINE)},
+        sparse_vectors_config={"sparse": models.SparseVectorParams(
+            modifier=models.Modifier.IDF)},
+    )
+    for field in KEYWORD_FIELDS:
+        client.create_payload_index(name, field, models.PayloadSchemaType.KEYWORD)
+    for field in INTEGER_FIELDS:
+        client.create_payload_index(name, field, models.PayloadSchemaType.INTEGER)
+
+
+def _points(chunks: list[dict]) -> list[models.PointStruct]:
+    texts = [c["text"] for c in chunks]
+    dense = dense_model().passage_embed(texts, batch_size=BATCH)
+    sparse = sparse_model().passage_embed(texts, batch_size=BATCH)
+    return [
+        models.PointStruct(
+            id=point_id(c["accession_no"], c["item"], c["chunk_index"]),
+            vector={"dense": d.tolist(),
+                    "sparse": models.SparseVector(indices=s.indices.tolist(),
+                                                  values=s.values.tolist())},
+            payload=c,
+        )
+        for c, d, s in zip(chunks, dense, sparse, strict=True)
+    ]
 
 
 def index_chunks(paths: list[Path], collection: str | None = None) -> int:
     """Upsert every chunk in `paths`; returns the number of points written."""
-    raise NotImplementedError("track-b")
+    collection = collection or get_settings().qdrant_collection
+    client = qdrant()
+    ensure_collection(client, collection)
+    n = 0
+    batch: list[dict] = []
+    for path in paths:
+        for chunk in read_chunks(path):
+            batch.append(chunk)
+            if len(batch) == BATCH:
+                client.upsert(collection, _points(batch))
+                n += len(batch)
+                batch = []
+    if batch:
+        client.upsert(collection, _points(batch))
+        n += len(batch)
+    return n
 
 
 def main() -> None:
-    raise NotImplementedError("track-b")
+    s = get_settings()
+    paths = sorted(CHUNKS_DIR.glob("*.jsonl"))
+    t0 = time.perf_counter()
+    n = index_chunks(paths)
+    dt = time.perf_counter() - t0
+    total = qdrant().count(s.qdrant_collection, exact=True).count
+    print(f"indexed {n} chunks from {len(paths)} files in {dt:.1f}s "
+          f"({n / dt if dt else 0:.1f} chunks/s); "
+          f"collection {s.qdrant_collection!r} has {total} points")
+
+
+if __name__ == "__main__":
+    main()
