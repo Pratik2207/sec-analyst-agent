@@ -26,6 +26,12 @@ services:
       - "[::1]:6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
+    healthcheck:
+      # The image has no curl/wget; probe /readyz over bash's /dev/tcp.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 && printf \"GET /readyz HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q \"200 OK\" <&3'"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
   pgdata:
