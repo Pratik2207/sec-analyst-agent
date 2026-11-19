@@ -165,7 +165,7 @@ Tracks: parallel
   - track-a: dataset drafting and the validator; owns: `evals/dataset.jsonl`, `evals/validate_dataset.py`, `tests/evals_dataset/`
   - track-b: runner, scorers and report; owns: `evals/run_eval.py`, `evals/scoring/`, `tests/evals_scoring/`
 
-## Phase 6: Scale and ship  [status: planned]
+## Phase 6: Scale and ship  [status: in progress]
 Goal: Scale to all 50 companies, then add the Streamlit UI with streaming, Langfuse tracing, the app in Docker Compose, and a README with final results.
 Requirements: FR-15, FR-19, NFR-11, NFR-12, X-7, X-8
 Deliverables: `ui/app.py`; an SSE endpoint `POST /ask/stream`; `src/observability/tracing.py` (Langfuse callback); Langfuse v3 and app services in `docker-compose.yml`, plus a `Dockerfile`; `src/ingest/run_all.py`; README.

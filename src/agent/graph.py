@@ -17,6 +17,7 @@ Uses answerer.answer, verifier.verify and evidence.render_answer (track-b / cont
 
 import re
 import time
+from collections.abc import Iterator
 from functools import lru_cache
 
 from langgraph.graph import END, StateGraph
@@ -34,6 +35,7 @@ from src.agent.state import (
     PlanStep,
 )
 from src.api.schemas import AskResponse, Step, Tokens
+from src.observability.tracing import get_tracer
 from src.tools import calculator, companies_tool, search_tool, section_tool, sql_tool
 from src.tools.types import ToolResult
 
@@ -135,6 +137,15 @@ def run_calculate(step: PlanStep, prior: list[ToolResult]) -> tuple[ToolResult, 
 
 
 def dispatch(step: PlanStep, prior: list[ToolResult]) -> tuple[ToolResult, dict]:
+    """Run one step's tool, traced as a span (NFR-12). Never raises."""
+    with get_tracer().span(f"tool:{step.tool}", step.model_dump(exclude_defaults=True)) as sp:
+        res, extra = _dispatch(step, prior)
+        sp.update(output={"ok": res.ok, "items": len(res.data), "error": res.error},
+                  metadata={k: v for k, v in extra.items() if k == "sql"})
+    return res, extra
+
+
+def _dispatch(step: PlanStep, prior: list[ToolResult]) -> tuple[ToolResult, dict]:
     """Run one step's tool. Never raises: bad arguments become a failed ToolResult.
     Returns the result and extra trace detail (the SQL, calculate notes)."""
     extra: dict = {}
@@ -352,8 +363,31 @@ def run_agent(question: str) -> AskResponse:
 def run_agent_traced(question: str) -> tuple[AskResponse, list[ToolResult]]:
     """run_agent plus the tool results the answer was written from (Phase 5 evals score
     faithfulness against them)."""
+    for ev in run_agent_events(question):
+        if ev["type"] == "final":
+            return ev["data"], ev["tool_results"]
+    raise RuntimeError("agent produced no final event")
+
+
+def run_agent_events(question: str) -> Iterator[dict]:
+    """Phase 6 contract (FR-19): the agent loop as events, each step as soon as its node
+    finishes: {"type": "step", "data": Step} ..., then exactly one
+    {"type": "final", "data": AskResponse, "tool_results": [...]} (tool_results is internal;
+    the SSE endpoint must not send it)."""
     start = time.perf_counter()
-    state = build_graph().invoke(initial_state(question), {"recursion_limit": 60})
+    state, seen = None, 0
+    for state in build_graph().stream(initial_state(question), {"recursion_limit": 60},
+                                      stream_mode="values"):
+        trace = state.get("trace") or []
+        for st in trace[seen:]:
+            yield {"type": "step", "data": st}
+        seen = len(trace)
+    resp = _final_response(state, start)
+    yield {"type": "step", "data": resp.steps[-1]}   # the flags step
+    yield {"type": "final", "data": resp, "tool_results": state["tool_results"]}
+
+
+def _final_response(state: AgentState, start: float) -> AskResponse:
     draft = state.get("draft")
     if draft is None or draft.not_found or not draft.claims:
         text, citations = NOT_FOUND, []
@@ -363,5 +397,4 @@ def run_agent_traced(question: str) -> tuple[AskResponse, list[ToolResult]]:
         "flags": state["flags"], "stop_reason": state.get("stop_reason"),
         "tool_calls": state["tool_calls"]})]
     return AskResponse(answer=text, citations=citations, steps=steps, tokens=state["tokens"],
-                       latency_ms=int((time.perf_counter() - start) * 1000)), \
-        state["tool_results"]
+                       latency_ms=int((time.perf_counter() - start) * 1000))

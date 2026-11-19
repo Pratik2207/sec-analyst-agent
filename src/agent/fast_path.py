@@ -17,6 +17,7 @@ import time
 from config.settings import load_companies, load_metric_map
 from src.agent.router import FactQuery, Route
 from src.api.schemas import AskResponse, Step
+from src.observability.tracing import get_tracer
 from src.tools import sql_tool
 
 NOT_FOUND = "Not found in the filings."
@@ -58,7 +59,9 @@ def answer(question: str, r: Route) -> AskResponse:
                                         "ticker": q.ticker, "metric": q.metric,
                                         "fiscal_year": q.fiscal_year})]
     sql = build_sql(q)
-    res = sql_tool.call(sql)
+    with get_tracer().span("tool:sql_query", {"sql": sql}) as sp:   # NFR-12
+        res = sql_tool.call(sql)
+        sp.update(output={"ok": res.ok, "items": len(res.data), "error": res.error})
     steps.append(Step(name="sql_query", detail={"sql": sql, "ok": res.ok, "rows": res.data,
                                                  "error": res.error}))
 

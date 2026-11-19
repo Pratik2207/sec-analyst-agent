@@ -6,12 +6,14 @@ fall back instead of crashing /ask.
 """
 
 import json
+import time
 
 import httpx
 import ollama
 
 from config.settings import get_settings
 from src.api.schemas import Tokens
+from src.observability.tracing import get_tracer
 
 KEEP_ALIVE = "5m"
 
@@ -28,6 +30,7 @@ def _strip_reasoning(text: str) -> str:
 def chat_json(model: str, system: str, user: str, schema: dict,
               think: bool = False) -> tuple[dict, Tokens]:
     s = get_settings()
+    t0 = time.perf_counter()
     try:
         resp = ollama.Client(host=s.ollama_host, timeout=s.llm_timeout_s).chat(
             model=model,
@@ -39,6 +42,10 @@ def chat_json(model: str, system: str, user: str, schema: dict,
         raise LLMError(f"{model}: {type(e).__name__}: {e}") from e
     tokens = Tokens(prompt=resp.prompt_eval_count or 0, completion=resp.eval_count or 0)
     text = _strip_reasoning(resp.message.content or "")
+    get_tracer().generation(f"llm:{model}", model, input={"system": system[:2000],
+                                                          "user": user[:4000]},
+                            output=text[:4000], usage=tokens,
+                            latency_s=time.perf_counter() - t0)   # NFR-12
     if not text:
         raise LLMError(f"{model}: empty reply")
     try:

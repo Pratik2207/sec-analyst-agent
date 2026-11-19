@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +60,36 @@ class Settings(BaseSettings):
     search_use_reranker: bool = True      # search_filings tool
     search_use_sparse: bool = True        # search_filings tool
     agent_disabled_tools: list[str] = []  # e.g. ["sql_query"] for the "text only" ablation
+
+    # Phase 6: tracing (NFR-12) is on only when both keys are set (Langfuse project keys).
+    langfuse_host: str = "http://localhost:3000"
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    # Phase 6: inside docker the database is "postgres:5432", not "localhost:5433"; these
+    # rewrite the host/port of DATABASE_URL and AGENT_DATABASE_URL without touching .env.
+    db_host: str | None = None
+    db_port: int | None = None
+    # Streamlit UI -> API
+    api_url: str = "http://localhost:8000"
+
+    @model_validator(mode="after")
+    def _apply_db_override(self) -> "Settings":
+        if self.db_host or self.db_port:
+            from psycopg.conninfo import conninfo_to_dict, make_conninfo
+
+            def swap(url: str) -> str:
+                d = conninfo_to_dict(url)
+                d["host"] = self.db_host or d.get("host")
+                d["port"] = str(self.db_port or d.get("port"))
+                return make_conninfo(**d)
+
+            self.database_url = swap(self.database_url)
+            self.agent_database_url = swap(self.agent_database_url)
+        return self
+
+    @property
+    def tracing_enabled(self) -> bool:
+        return bool(self.langfuse_public_key and self.langfuse_secret_key)
 
 
 @lru_cache
