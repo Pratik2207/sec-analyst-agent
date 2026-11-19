@@ -29,7 +29,9 @@ class Settings(BaseSettings):
     embed_model: str = "BAAI/bge-small-en-v1.5"
     embed_dim: int = 384
     sparse_model: str = "Qdrant/bm25"
-    rerank_model: str = "BAAI/bge-reranker-base"
+    # MiniLM-L6: 20/20 recall@10 and 16/20 at rank 1 on the retrieval check at 2.3 s/search
+    # on CPU, vs bge-reranker-base 17/20 at 12.1 s (Phase 2 measurement, user's choice).
+    rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"
     # bge-small and bge-reranker-base read at most 512 tokens; keep whole chunks inside that.
     chunk_max_tokens: int = 480
     chunk_min_tokens: int = 300
