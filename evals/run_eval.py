@@ -300,6 +300,10 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--dataset", type=Path, default=DATASET)
     p.add_argument("--systems", nargs="+", choices=all_systems, default=all_systems)
     p.add_argument("--limit", type=int, help="only the first N questions (after --types)")
+    p.add_argument("--per-type", metavar="SPEC",
+                   help="stratified subset, e.g. number=10,text=10,multihop=8,unanswerable=4: "
+                        "evenly spaced picks within each type (spreads companies/years); "
+                        f"'quick' = {QUICK}")
     p.add_argument("--types", nargs="+", choices=report.TYPES)
     p.add_argument("--skip-judge", action="store_true", help="no judge calls (cached used)")
     p.add_argument("--skip-noheader", action="store_true",
@@ -309,6 +313,32 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
+QUICK = "number=10,text=10,multihop=8,unanswerable=4"
+
+
+def parse_per_type(spec: str) -> dict[str, int]:
+    spec = QUICK if spec == "quick" else spec
+    out = {}
+    for part in spec.split(","):
+        t, _, n = part.partition("=")
+        if t.strip() not in report.TYPES or not n.strip().isdigit():
+            raise SystemExit(f"bad --per-type part {part!r} (types: {', '.join(report.TYPES)})")
+        out[t.strip()] = int(n)
+    return out
+
+
+def stratified(items: list[DatasetItem], counts: dict[str, int]) -> list[DatasetItem]:
+    """Evenly spaced picks within each type (deterministic), so a subset still spans the
+    companies and years the dataset is ordered by. Types not named are dropped."""
+    out = []
+    for t in report.TYPES:
+        pool = [it for it in items if it.type == t]
+        n = min(counts.get(t, 0), len(pool))
+        if n:
+            out += [pool[round(i * (len(pool) - 1) / max(n - 1, 1))] for i in range(n)]
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     a = parse_args(argv)
     items = load_dataset(a.dataset)
@@ -316,6 +346,8 @@ def main(argv: list[str] | None = None) -> int:
         items = [it for it in items if it.type in a.types]
     if a.limit:
         items = items[:a.limit]
+    if a.per_type:
+        items = stratified(items, parse_per_type(a.per_type))
     out = RESULTS_DIR / a.run_id
     raw = out / "raw"
     t0 = time.perf_counter()

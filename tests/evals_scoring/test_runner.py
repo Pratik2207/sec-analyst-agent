@@ -299,3 +299,18 @@ def test_failure_causes():
     assert causes == {"err": "exception/tool error", "ref": "refused but answerable",
                       "na": "answered unanswerable", "txt": "retrieval miss",
                       "num": "wrong number", "mh": "judge-partial"}
+
+
+def test_stratified_subset_is_even_and_deterministic():
+    from evals.schema import DatasetItem
+    items = [DatasetItem(id=f"num-{i:03d}", type="number", question=f"q{i}", gold_answer="a")
+             for i in range(40)]
+    items += [DatasetItem(id=f"na-{i:03d}", type="unanswerable", question=f"n{i}",
+                          gold_answer="a") for i in range(10)]
+    pick = run_eval.stratified(items, run_eval.parse_per_type("number=10,unanswerable=4"))
+    nums = [p.id for p in pick if p.type == "number"]
+    assert len(nums) == 10 and nums[0] == "num-000" and nums[-1] == "num-039"
+    assert len({p.id for p in pick}) == len(pick) == 14
+    assert pick == run_eval.stratified(items, run_eval.parse_per_type("number=10,unanswerable=4"))
+    assert sum(1 for p in run_eval.stratified(items, run_eval.parse_per_type("quick"))
+               if p.type == "number") == 10
