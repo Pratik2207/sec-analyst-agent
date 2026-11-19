@@ -83,7 +83,13 @@ def test_latency_includes_routing(monkeypatch):
         time.sleep(0.05)
         return Route("agent", reason="x")
 
+    from src.agent import graph
+    from src.api.schemas import AskResponse
+
     monkeypatch.setattr(router, "route", slow_route)
+    # stub the agent: this unit test must not run the real LLM loop (track-b finding)
+    monkeypatch.setattr(graph, "run_agent", lambda q: AskResponse(
+        answer="a", citations=[], steps=[], tokens=Tokens(), latency_ms=0))
     body = TestClient(main.app).post("/ask", json={"question": "q"}).json()
     assert body["latency_ms"] >= 50
 
