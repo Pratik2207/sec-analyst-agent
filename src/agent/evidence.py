@@ -41,7 +41,10 @@ def evidence_items(tool_results: list[ToolResult]) -> list[EvidenceItem]:
             elif "result" in d and "expression" in d:   # a calculation
                 who = f"{d['ticker']} " if d.get("ticker") else ""
                 label = d.get("name") or "result"
-                text = f"{who}{label} = {d['result']:.6g} (computed: {d['expression']})"
+                # Small models misread the sign of a change; state the direction in words.
+                way = (f", {direction(d['result'])}"
+                       if is_change(label, d["expression"]) else "")
+                text = f"{who}{label} = {d['result']:.6g}{way} (computed: {d['expression']})"
                 items.append(EvidenceItem(sid, "calc", text, [float(d["result"])]))
             elif "text" in d:                            # a chunk or a section
                 head = (f"{d.get('ticker', '')} FY{d.get('fiscal_year', '')} "
@@ -52,6 +55,20 @@ def evidence_items(tool_results: list[ToolResult]) -> list[EvidenceItem]:
                 text = ", ".join(f"{k}={v}" for k, v in d.items() if k != "source_id")
                 items.append(EvidenceItem(sid, "info", text))
     return items
+
+
+_CHANGE_NAME = re.compile(r"chang|diff|delta|growth|grow|increase|decrease|yoy", re.I)
+_YEAR_VAR = re.compile(r"_((?:19|20)\d\d)\b")
+
+
+def is_change(name: str, expression: str) -> bool:
+    """A calc is a change when its name says so, or it subtracts values of two years."""
+    years = set(_YEAR_VAR.findall(expression or ""))
+    return bool(_CHANGE_NAME.search(name or "")) or (len(years) >= 2 and "-" in expression)
+
+
+def direction(value: float) -> str:
+    return "increased" if value > 0 else "decreased" if value < 0 else "unchanged"
 
 
 def render_evidence(items: list[EvidenceItem]) -> str:

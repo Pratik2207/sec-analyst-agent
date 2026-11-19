@@ -31,6 +31,8 @@ RULES
   differences) goes through calculate with <metric>_<year> variables. Never do math yourself.
 - Gross margin = gross_profit / revenue. R&D share of revenue = rd_expense / revenue.
   % change = (x_2025 - x_2024) / x_2024 * 100.
+  Change of a share or margin, in percentage points =
+  (a_2025 / b_2025 - a_2024 / b_2024) * 100. Name change results "..._change".
 - Metrics each sector reports (do not ask a sector for metrics it lacks):
 {sector_metrics}
 - Use exactly the fiscal years the question names, even if you think no data exists.
@@ -47,16 +49,16 @@ fell, FY2024 to FY2025?
   "sector": "semiconductors", "metrics": ["rd_expense", "revenue", "gross_profit"],
   "fiscal_years": [2024, 2025]},
  {"about": "change in R&D share of revenue", "action": "calculate", "name": "rd_share_change",
-  "expression": "rd_expense_2025 / revenue_2025 - rd_expense_2024 / revenue_2024"},
+  "expression": "(rd_expense_2025 / revenue_2025 - rd_expense_2024 / revenue_2024) * 100"},
  {"about": "change in gross margin", "action": "calculate", "name": "gross_margin_change",
-  "expression": "gross_profit_2025 / revenue_2025 - gross_profit_2024 / revenue_2024"}]}
+  "expression": "(gross_profit_2025 / revenue_2025 - gross_profit_2024 / revenue_2024) * 100"}]}
 
 Question: Why did AMD's gross margin fall in 2024?
 {"steps": [
  {"about": "AMD gross profit and revenue", "action": "sql_query", "tickers": ["AMD"],
   "metrics": ["gross_profit", "revenue"], "fiscal_years": [2023, 2024]},
  {"about": "AMD gross margin change", "action": "calculate", "name": "gross_margin_change",
-  "expression": "gross_profit_2024 / revenue_2024 - gross_profit_2023 / revenue_2023"},
+  "expression": "(gross_profit_2024 / revenue_2024 - gross_profit_2023 / revenue_2023) * 100"},
  {"about": "AMD's explanation of its gross margin", "action": "search_filings",
   "query": "gross margin decrease reasons", "tickers": ["AMD"], "fiscal_years": [2024],
   "item": "7"}]}

@@ -60,11 +60,20 @@ def test_fast_route_not_found_when_no_rows(fast):
     assert body["answer"] == fast_path.NOT_FOUND and body["citations"] == []
 
 
-def test_agent_route_returns_placeholder(monkeypatch):
-    monkeypatch.setattr(router, "route", lambda q: Route("agent", reason="multi-hop"))
+def test_agent_route_runs_agent_and_prefixes_route_step(monkeypatch):
+    from src.agent import graph
+    from src.api.schemas import AskResponse, Step
+
+    monkeypatch.setattr(router, "route", lambda q: Route("agent", reason="multi-hop",
+                                                         tokens=Tokens(prompt=2, completion=1)))
+    monkeypatch.setattr(graph, "run_agent", lambda q: AskResponse(
+        answer="A [1].", citations=[], steps=[Step(name="plan", detail={})],
+        tokens=Tokens(prompt=10, completion=5), latency_ms=0))
     body = TestClient(main.app).post("/ask", json={"question": "Which chip makers..."}).json()
-    assert body["answer"] == main.AGENT_PENDING and body["citations"] == []
+    assert body["answer"] == "A [1]."
+    assert [s["name"] for s in body["steps"]] == ["route", "plan"]
     assert body["steps"][0]["detail"] == {"kind": "agent", "reason": "multi-hop"}
+    assert body["tokens"] == {"prompt": 12, "completion": 6}
 
 
 def test_latency_includes_routing(monkeypatch):

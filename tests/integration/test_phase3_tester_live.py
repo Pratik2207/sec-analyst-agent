@@ -151,7 +151,7 @@ def test_semis_question_routes_to_agent(client):
     body = client.post("/ask", json={"question": SEMIS}).json()
     AskResponse.model_validate(body)
     assert body["steps"][0]["detail"]["kind"] == "agent"
-    assert body["citations"] == []
+    # Phase 4: the agent now answers (Phase 3 asserted the placeholder had no citations)
 
 
 # ---- AC4: live baseline answer has the /ask shape (1 LLM call, ~40 s) ----------------------
