@@ -23,5 +23,5 @@
 {"q": "What was Apple's revenue in 2024?", "kind": "agent"}
 {"q": "What were Intel's revenue and net income in FY2024?", "kind": "agent"}
 {"q": "Explain Pfizer's revenue decline in 2024", "kind": "agent"}
-{"q": "What was JPMorgan's earnings per share in 2024?", "kind": "agent", "llm": true}
+{"q": "What was JPMorgan's earnings per share in 2024?", "kind": "agent"}
 {"q": "What did Merck say about Keytruda patent expiry in its 2025 annual report?", "kind": "agent", "llm": true}

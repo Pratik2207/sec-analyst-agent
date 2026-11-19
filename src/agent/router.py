@@ -70,7 +70,8 @@ _AGENT_WORDS = re.compile(
     r"\b(why|explain\w*|compar\w*|vs\.?|versus|which|who|rank\w*|highest|lowest|largest|"
     r"smallest|biggest|most|least|top|trend\w*|chang\w*|grow\w*|grew|increas\w*|"
     r"decreas\w*|declin\w*|fell|fall\w*|rise|rose|raised?|ratio\w*|share of|margins?|"
-    r"percent\w*|between|both|each|all|average\w*|total of|sum|combined|over time|since)\b"
+    r"percent\w*|between|both|each|all|average\w*|total of|sum|combined|over time|since|"
+    r"per[ -]share|eps)\b"
     r"|%",
     re.IGNORECASE,
 )
