@@ -111,7 +111,7 @@ Tracks: parallel
   - track-b: index_qdrant, hybrid search and the reranker, which read the chunk JSONL and are tested with fixture chunks; owns: `src/ingest/index_qdrant.py`, `src/retrieval/`, `tests/retrieval/`
   - After the merge (main session): `scripts/retrieval_check.py`, the 20-question check, and the Qdrant compose healthcheck (`docker-compose.yml` is owned by main, not a track).
 
-## Phase 3: Tools, fast path, naive baseline  [status: planned]
+## Phase 3: Tools, fast path, naive baseline  [status: in progress]
 Goal: Build all five agent tools, a working fast path for simple questions, and the naive RAG baseline.
 Requirements: FR-9, FR-16, FR-18
 Deliverables: `src/tools/{search_tool,section_tool,calculator,companies_tool}.py` (plus `sql_tool` from Phase 1); `src/agent/router.py` and `src/agent/fast_path.py`; `src/baseline/naive_rag.py`; `/ask` wired to the router.

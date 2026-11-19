@@ -14,6 +14,7 @@ import sqlglot
 from sqlglot import exp
 
 from config.settings import get_settings, load_metric_map
+from src.tools.types import Source, ToolResult, edgar_index_url, tool_spec
 
 MAX_ROWS = 200
 
@@ -102,3 +103,44 @@ def run(sql: str, params: tuple | dict | None = None, max_rows: int = MAX_ROWS,
     rows = [{c: _json_value(v) for c, v in zip(columns, r, strict=True)} for r in raw[:max_rows]]
     return {"ok": True, "columns": columns, "rows": rows, "truncated": len(raw) > max_rows,
             "error": None}
+
+
+# ---- agent tool entry point (Phase 3 contract: src/tools/types.py) --------------------------
+
+SPEC = tool_spec(
+    "sql_query", DESCRIPTION,
+    {"sql": {"type": "string", "description": "one PostgreSQL SELECT statement"}},
+    ["sql"],
+)
+
+_FILINGS_SQL = ("SELECT DISTINCT f.accession_no, f.ticker, f.fiscal_year, c.cik "
+                "FROM financial_facts f JOIN companies c ON c.ticker = f.ticker "
+                "WHERE f.accession_no = ANY(%s)")
+
+
+def call(sql: str) -> ToolResult:
+    """Run the agent's SELECT. Each row with an accession_no gets source_id
+    "xbrl:<accession_no>"; sources describe those filings (Item 8 XBRL data)."""
+    res = run(sql)
+    if not res["ok"]:
+        return ToolResult.fail(res["error"])
+    accns = sorted({r["accession_no"] for r in res["rows"] if r.get("accession_no")})
+    sources: list[Source] = []
+    if accns:
+        filings = run(_FILINGS_SQL, (accns,))
+        for f in filings["rows"]:
+            sources.append(Source(
+                source_id=f"xbrl:{f['accession_no']}", kind="xbrl", ticker=f["ticker"],
+                form="10-K", fiscal_year=f["fiscal_year"],
+                section="Item 8 Financial Statements (XBRL)",
+                url=edgar_index_url(f["cik"], f["accession_no"]),
+                accession_no=f["accession_no"]))
+    data = []
+    for r in res["rows"]:
+        sid = f"xbrl:{r['accession_no']}" if r.get("accession_no") else "companies"
+        data.append({**r, "source_id": sid})
+    if any(d["source_id"] == "companies" for d in data):
+        sources.append(Source(source_id="companies", kind="companies"))
+    if res["truncated"]:
+        data.append({"note": f"truncated to {MAX_ROWS} rows", "source_id": "companies"})
+    return ToolResult(ok=True, data=data, sources=sources)

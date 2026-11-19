@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     chunk_overlap: float = 0.15
     model_cache_dir: Path = DATA_DIR / "models"
 
+    # Phase 3: answer writer (also used by the naive RAG baseline).
+    answer_model: str = "qwen3:4b"
+    baseline_k: int = 8
+
 
 @lru_cache
 def get_settings() -> Settings:
