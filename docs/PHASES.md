@@ -86,7 +86,7 @@ Integration-test focus: the full XBRL load into a test DB, the role permissions 
 Depends on: none
 Tracks: single. This phase creates the folder layout that later tracks own.
 
-## Phase 2: Text pipeline  [status: in progress]
+## Phase 2: Text pipeline  [status: done]
 Goal: Turn the pilot 10-Ks into section-aware chunks in Qdrant, searchable with hybrid search and reranking.
 Requirements: FR-1, FR-4, FR-5, FR-6, NFR-8, X-4
 Deliverables: `src/ingest/{download_filings,parse_sections,chunker,index_qdrant}.py`, `src/retrieval/{hybrid_search,reranker}.py`, `scripts/retrieval_check.py`, plus 20 manual retrieval questions in `evals/retrieval_check.jsonl`; a Qdrant healthcheck in `docker-compose.yml` (added after Phase 1 review).
