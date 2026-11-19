@@ -69,7 +69,7 @@ The PRD's functional requirements already have IDs (FR-1…FR-20). The non-funct
 
 ---
 
-## Phase 1: Walking skeleton + financial facts  [status: in progress]
+## Phase 1: Walking skeleton + financial facts  [status: done]
 Goal: Load XBRL facts for the 10 pilot companies into PostgreSQL, and have `POST /ask` answer one number question from it end to end.
 Requirements: FR-2, FR-3, FR-8, NFR-6, NFR-9, NFR-10, X-1, X-2, X-3
 Deliverables: `pyproject.toml` (uv); `config/{companies.yaml,metric_map.yaml,settings.py}`; `.env.example`; `docker-compose.yml` (postgres:16 on 5433, qdrant); `sql/schema.sql`; `src/sec_client.py` (shared User-Agent and ≤ 10 req/s limiter); `src/ingest/download_xbrl.py`; `src/ingest/coverage.py`; `src/tools/sql_tool.py`; `src/api/main.py` with a skeleton `/ask` (qwen3:1.7b extracts ticker/metric/year as structured output → SQL template → cited answer); the full folder layout from PRD §9 with empty packages; project `CLAUDE.md` with the exact install, test, lint and run commands.
