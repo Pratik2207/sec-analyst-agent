@@ -6,7 +6,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-sec_analyst}
     ports:
+      # Loopback only (IPv4 and IPv6, so "localhost" connects at once on Windows).
       - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+      - "[::1]:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,6 +22,8 @@ services:
     ports:
       - "127.0.0.1:6333:6333"
       - "127.0.0.1:6334:6334"
+      - "[::1]:6333:6333"
+      - "[::1]:6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
 
