@@ -4,16 +4,17 @@ import pytest
 
 from src.agent import answerer, llm
 from src.agent.state import Draft
+from src.agent.verifier import verify
 from src.api.schemas import Tokens
 from src.tools.types import ToolResult
-from tests.agent_answer.fixtures import NVDA_FY25_XBRL, NVDA_GM_CHUNK, calcs, facts
+from tests.agent_answer.fixtures import NVDA_FY25_XBRL, NVDA_GM_CHUNK, calcs, changes, facts
 
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
     for k, v in {"SEC_USER_AGENT": "test test@example.com",
-                 "DATABASE_URL": "postgresql://x:y@127.0.0.1:1/x",
-                 "AGENT_DATABASE_URL": "postgresql://x:y@127.0.0.1:1/x"}.items():
+                 "DATABASE_URL": "postgresql://x:change-me@127.0.0.1:1/x",
+                 "AGENT_DATABASE_URL": "postgresql://x:change-me@127.0.0.1:1/x"}.items():
         monkeypatch.setenv(k, v)
 
 
@@ -138,3 +139,20 @@ def test_ids_about_other_companies_are_dropped(stub):
         # the NVDA claim citing only an INTC calc is dropped entirely
         ["calc:1", "calc:9"],    # names no company: left alone
         ["calc:1", "calc:9"]]    # AMD calc dropped
+
+
+def test_citations_repaired_from_the_named_companys_items(stub):
+    # Live failure mode: cites the change calc (calc:17, NVDA) but quotes the yearly ratios.
+    stub({"not_found": False, "claims": [
+        {"text": "NVDA reduced R&D as a share of revenue from 14.2395% to 9.89601%.",
+         "source_ids": ["calc:17"]},
+        {"text": "NVDA's R&D share was 25.04% in FY2024.",      # AMD's number: no repair
+         "source_ids": ["calc:17"]},
+        {"text": "R&D share went from 14.2395% to 9.89601%.",   # names no company: no repair
+         "source_ids": ["calc:17"]}]})
+    results = [facts(), calcs(), changes()]
+    draft, _ = answerer.answer("q", results)
+    assert [c.source_ids for c in draft.claims] == [
+        ["calc:17", "calc:1", "calc:3"], ["calc:17"], ["calc:17"]]
+    vr = verify(draft, results)
+    assert vr.ok_claims == draft.claims[:1] and len(vr.failed_claims) == 2

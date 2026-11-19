@@ -72,6 +72,28 @@ def _fmt(v: float) -> str:
     return f"{v:.4f}".rstrip("0").rstrip(".")
 
 
+def _unsupported(text: str, cited: list[str], items: dict[str, list[dict]]) -> list[float]:
+    pool = [v for sid in cited for v in _pool(sid, items)]
+    return [n for n in checked_numbers(text) if not any(number_matches(n, v) for v in pool)]
+
+
+def _stated_in(bad: list[float], cited: list[str], items: dict[str, list[dict]],
+               among: set[str] | None = None) -> list[str]:
+    """Uncited ids (within `among` if given) whose own numbers include some of `bad`. Calc
+    inputs are not expanded, so a ratio points to its calc and a raw value to its filing."""
+    return [sid for sid in items if sid not in cited and (among is None or sid in among)
+            and any(number_matches(n, v) for n in bad for v in _pool(sid, items, depth=3))][:4]
+
+
+def stated_in(text: str, source_ids: list[str], tool_results: list[ToolResult],
+              among: set[str]) -> list[str]:
+    """Ids in `among` that state numbers of `text` which its cited `source_ids` do not
+    (used by the answer writer to repair citations)."""
+    items, _ = _index(tool_results)
+    bad = _unsupported(text, source_ids, items)
+    return _stated_in(bad, source_ids, items, among) if bad else []
+
+
 def _check(claim: Claim, items: dict[str, list[dict]], known: set[str]) -> str | None:
     """None if the claim passes, else a short reason."""
     if not claim.source_ids:
@@ -79,21 +101,17 @@ def _check(claim: Claim, items: dict[str, list[dict]], known: set[str]) -> str |
     unknown = [s for s in claim.source_ids if s not in known]
     if unknown:
         return f"cites unknown source id(s): {', '.join(unknown)}"
-    pool = [v for sid in claim.source_ids for v in _pool(sid, items)]
-    bad = [n for n in checked_numbers(claim.text)
-           if not any(number_matches(n, v) for v in pool)]
+    bad = _unsupported(claim.text, claim.source_ids, items)
     if not bad:
         return None
+    pool = [v for sid in claim.source_ids for v in _pool(sid, items)]
     has = ", ".join(_fmt(v) for v in list(dict.fromkeys(pool))[:5]) or "no numbers"
     more = ", ..." if len(set(pool)) > 5 else ""
     reason = (f"{', '.join(_fmt(n) for n in bad)} not found in cited "
               f"{', '.join(claim.source_ids)} (has {has}{more})")
-    # Point the re-answer at the items that do state these numbers (calc inputs not expanded,
-    # so a ratio points to its calc and a raw value to its filing).
-    elsewhere = [sid for sid in items if sid not in claim.source_ids
-                 and any(number_matches(n, v) for n in bad for v in _pool(sid, items, depth=3))]
+    elsewhere = _stated_in(bad, claim.source_ids, items)
     if elsewhere:
-        reason += f"; stated in {', '.join(elsewhere[:4])}"
+        reason += f"; stated in {', '.join(elsewhere)}"
     return reason
 
 

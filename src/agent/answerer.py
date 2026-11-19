@@ -19,6 +19,10 @@ Company check: when a claim names companies (ticker as a word, or the full name 
 config/companies.yaml, e.g. "INTC" or "Intel"), cited ids whose items are about only other
 companies are dropped (the small model tends to cite a neighbour's calc). Ids without a
 ticker, and claims that name no company, are left alone.
+Citation repair: for a claim that names companies, a number its cited items do not state
+gets the ids of those companies' items that do state it (verifier.stated_in) added. Measured
+need: qwen3:4b-instruct cites a change calc while quoting the per-year ratios, and repeats
+the same claims on re-answer even when told which ids state the numbers.
 """
 
 import re
@@ -28,6 +32,7 @@ from config.settings import get_settings, load_companies
 from src.agent import llm
 from src.agent.evidence import evidence_items, numbers_in, render_evidence
 from src.agent.state import Claim, Draft
+from src.agent.verifier import stated_in
 from src.api.schemas import Tokens
 from src.tools.types import ToolResult
 
@@ -82,7 +87,8 @@ def _names(text: str, tickers: set[str], names: dict[str, str]) -> set[str]:
             or (t in names and re.search(rf"\b{re.escape(names[t])}\b", text, re.I))}
 
 
-def _claims(raw: dict, ids: set[str], tickers: dict[str, set[str]]) -> list[Claim]:
+def _claims(raw: dict, ids: set[str], tool_results: list[ToolResult]) -> list[Claim]:
+    tickers = _tickers_by_id(tool_results)
     all_tickers = set().union(*tickers.values()) if tickers else set()
     names = {c["ticker"]: c["name"] for c in load_companies()}
     out = []
@@ -95,6 +101,9 @@ def _claims(raw: dict, ids: set[str], tickers: dict[str, set[str]]) -> list[Clai
         named = _names(text, all_tickers, names)
         if named:
             sids = [s for s in sids if not tickers.get(s) or tickers[s] & named]
+            if sids:
+                own = {s for s, ts in tickers.items() if ts & named}
+                sids += stated_in(text, sids, tool_results, own)
         if text and sids:
             out.append(Claim(text=text, source_ids=sids, numbers=numbers_in(text)))
     return out[:MAX_CLAIMS]
@@ -114,5 +123,5 @@ def answer(question: str, tool_results: list[ToolResult],
         return Draft(not_found=True), Tokens()
     if not isinstance(raw, dict) or raw.get("not_found") is True:
         return Draft(not_found=True), tokens
-    claims = _claims(raw, set(ids), _tickers_by_id(tool_results))
+    claims = _claims(raw, set(ids), tool_results)
     return Draft(claims=claims, not_found=not claims), tokens
