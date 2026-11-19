@@ -21,6 +21,7 @@ from functools import lru_cache
 
 from langgraph.graph import END, StateGraph
 
+from config.settings import get_settings
 from src.agent import answerer, evidence, grader, planner, verifier
 from src.agent.fast_path import NOT_FOUND
 from src.agent.llm import LLMError
@@ -137,6 +138,8 @@ def dispatch(step: PlanStep, prior: list[ToolResult]) -> tuple[ToolResult, dict]
     """Run one step's tool. Never raises: bad arguments become a failed ToolResult.
     Returns the result and extra trace detail (the SQL, calculate notes)."""
     extra: dict = {}
+    if step.tool in get_settings().agent_disabled_tools:   # Phase 5 ablation
+        return ToolResult.fail(f"{step.tool} is disabled"), extra
     try:
         if step.tool == "sql_query":
             extra["sql"] = build_sql(step)
@@ -343,6 +346,12 @@ def initial_state(question: str) -> AgentState:
 
 
 def run_agent(question: str) -> AskResponse:
+    return run_agent_traced(question)[0]
+
+
+def run_agent_traced(question: str) -> tuple[AskResponse, list[ToolResult]]:
+    """run_agent plus the tool results the answer was written from (Phase 5 evals score
+    faithfulness against them)."""
     start = time.perf_counter()
     state = build_graph().invoke(initial_state(question), {"recursion_limit": 60})
     draft = state.get("draft")
@@ -354,4 +363,5 @@ def run_agent(question: str) -> AskResponse:
         "flags": state["flags"], "stop_reason": state.get("stop_reason"),
         "tool_calls": state["tool_calls"]})]
     return AskResponse(answer=text, citations=citations, steps=steps, tokens=state["tokens"],
-                       latency_ms=int((time.perf_counter() - start) * 1000))
+                       latency_ms=int((time.perf_counter() - start) * 1000)), \
+        state["tool_results"]

@@ -13,7 +13,7 @@ from pathlib import Path
 from qdrant_client import QdrantClient, models
 
 from config.settings import get_settings
-from src.ingest.chunk_schema import CHUNKS_DIR, point_id, read_chunks
+from src.ingest.chunk_schema import CHUNKS_DIR, chunk_body, point_id, read_chunks
 from src.retrieval.models import dense_model, qdrant, sparse_model
 
 BATCH = 64
@@ -62,15 +62,20 @@ def _delete_filing(client: QdrantClient, collection: str, accession_no: str) -> 
                                     match=models.MatchValue(value=accession_no))])))
 
 
-def index_chunks(paths: list[Path], collection: str | None = None) -> int:
+def index_chunks(paths: list[Path], collection: str | None = None,
+                 use_headers: bool = True) -> int:
     """Replace each file's filing in the collection; returns the number of points written.
-    Each chunk file holds one filing (chunk_schema: CHUNKS_DIR/<accession_no>.jsonl)."""
+    Each chunk file holds one filing (chunk_schema: CHUNKS_DIR/<accession_no>.jsonl).
+    use_headers=False indexes the bodies without context headers (Phase 5 ablation; the
+    payload text is the body too, so the reranker also sees no header)."""
     collection = collection or get_settings().qdrant_collection
     client = qdrant()
     ensure_collection(client, collection)
     n = 0
     for path in paths:
         chunks = list(read_chunks(path))
+        if not use_headers:
+            chunks = [{**c, "text": chunk_body(c)} for c in chunks]
         # The file name is the accession number (chunk_schema contract), so an empty file
         # still clears its filing.
         # Embed the whole filing before touching the collection, so an embedding failure

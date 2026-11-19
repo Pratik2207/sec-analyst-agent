@@ -62,6 +62,11 @@ def _client():
 
 
 def answer(question: str) -> AskResponse:
+    return answer_traced(question)[0]
+
+
+def answer_traced(question: str) -> tuple[AskResponse, list[SearchHit]]:
+    """answer plus the retrieved chunks (Phase 5 evals score faithfulness against them)."""
     start = time.perf_counter()
     s = get_settings()
     hits = hybrid_search(question, k=s.baseline_k, use_reranker=False, use_sparse=False)
@@ -77,4 +82,4 @@ def answer(question: str) -> AskResponse:
                Step(name="generate", detail={"model": s.answer_model})],
         tokens=Tokens(prompt=resp.prompt_eval_count or 0, completion=resp.eval_count or 0),
         latency_ms=int((time.perf_counter() - start) * 1000),
-    )
+    ), hits

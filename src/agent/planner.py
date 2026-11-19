@@ -142,7 +142,7 @@ def normalise_step(raw, earlier: list[PlanStep]) -> list[PlanStep]:
     if not isinstance(raw, dict):
         return []
     tool = raw.get("action", raw.get("tool"))
-    if tool not in TOOLS:
+    if tool not in TOOLS or tool in get_settings().agent_disabled_tools:   # ablation
         return []
     goal = (_opt_str(raw.get("about", raw.get("goal"))) or tool)[:300]
     tickers = _unique([t.strip().upper() for t in _str_list(raw.get("tickers"))

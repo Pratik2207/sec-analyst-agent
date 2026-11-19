@@ -6,7 +6,7 @@ Wraps src.retrieval.hybrid_search.hybrid_search. One data item per chunk:
 {"source_id": "chunk:<point_id>", "ticker", "fiscal_year", "item", "section", "text"}.
 """
 
-from config.settings import load_companies
+from config.settings import get_settings, load_companies
 from src.ingest.chunk_schema import FALLBACK_ITEM, ITEM_NAMES, TEXT_ITEMS
 from src.retrieval.hybrid_search import hybrid_search
 from src.retrieval.types import DEFAULT_K, SearchFilters
@@ -76,7 +76,9 @@ def call(query: str, ticker: str | None = None, sector: str | None = None,
 
     filters = SearchFilters(ticker=ticker, sector=sector, fiscal_year=fiscal_year, item=item)
     try:
-        hits = hybrid_search(query.strip(), filters, k=k)
+        s = get_settings()   # ablation switches (Phase 5)
+        hits = hybrid_search(query.strip(), filters, k=k, use_reranker=s.search_use_reranker,
+                             use_sparse=s.search_use_sparse)
     except Exception as e:  # Qdrant or model failure: a short message for the agent
         return ToolResult.fail(f"search failed: {type(e).__name__}: {e}")
 

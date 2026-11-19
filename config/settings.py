@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     # answer ~270 s. A stalled Ollama becomes LLMError instead of hanging /ask forever.
     llm_timeout_s: float = 300.0
 
+    # Phase 5 ablation switches (defaults = the full system).
+    search_use_reranker: bool = True      # search_filings tool
+    search_use_sparse: bool = True        # search_filings tool
+    agent_disabled_tools: list[str] = []  # e.g. ["sql_query"] for the "text only" ablation
+
 
 @lru_cache
 def get_settings() -> Settings:
