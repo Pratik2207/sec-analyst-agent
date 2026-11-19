@@ -196,7 +196,7 @@ def test_split_sections_overlap_about_15_percent():
     measured, missing = [], []
     for chunks in groups.values():
         chunks.sort(key=lambda c: c["chunk_index"])
-        for a, b in zip(chunks, chunks[1:]):
+        for a, b in zip(chunks, chunks[1:], strict=False):
             if b["chunk_index"] != a["chunk_index"] + 1:
                 continue
             body_a, body_b = chunk_body(a), chunk_body(b)
