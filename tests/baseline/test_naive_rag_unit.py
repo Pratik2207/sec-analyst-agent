@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from config.settings import get_settings
 from src.api.schemas import AskResponse
 from src.baseline import naive_rag
 from src.retrieval.types import SearchHit
@@ -92,12 +93,12 @@ def test_full_response(run):
                              {"k": 8, "use_reranker": False, "use_sparse": False})]
     assert len(client.calls) == 1
     call = client.calls[0]
-    assert call["model"] == "qwen3:4b" and call["think"] is False
+    assert call["model"] == get_settings().answer_model and call["think"] is False
     assert call["options"] == {"temperature": 0}
     assert [c.ticker for c in resp.citations] == ["T2"]
     assert [(s.name, s.detail) for s in resp.steps] == [
         ("retrieve", {"k": 8, "hits": ["id1", "id2", "id3"]}),
-        ("generate", {"model": "qwen3:4b"})]
+        ("generate", {"model": get_settings().answer_model})]
     assert (resp.tokens.prompt, resp.tokens.completion) == (123, 45)
     assert isinstance(resp.latency_ms, int) and resp.latency_ms >= 0
     assert AskResponse.model_validate(resp.model_dump()) == resp

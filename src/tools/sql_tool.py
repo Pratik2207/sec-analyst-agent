@@ -128,6 +128,8 @@ def call(sql: str) -> ToolResult:
     sources: list[Source] = []
     if accns:
         filings = run(_FILINGS_SQL, (accns,))
+        if not filings["ok"]:
+            return ToolResult.fail(f"could not resolve filing sources: {filings['error']}")
         for f in filings["rows"]:
             sources.append(Source(
                 source_id=f"xbrl:{f['accession_no']}", kind="xbrl", ticker=f["ticker"],
@@ -135,12 +137,15 @@ def call(sql: str) -> ToolResult:
                 section="Item 8 Financial Statements (XBRL)",
                 url=edgar_index_url(f["cik"], f["accession_no"]),
                 accession_no=f["accession_no"]))
+    cited = {s.source_id for s in sources}
     data = []
     for r in res["rows"]:
         sid = f"xbrl:{r['accession_no']}" if r.get("accession_no") else "companies"
-        data.append({**r, "source_id": sid})
-    if any(d["source_id"] == "companies" for d in data):
-        sources.append(Source(source_id="companies", kind="companies"))
+        # An accession_no that matches no loaded filing is not citable.
+        data.append({**r, "source_id": sid if sid in cited else "companies"})
     if res["truncated"]:
         data.append({"note": f"truncated to {MAX_ROWS} rows", "source_id": "companies"})
+    # Added last so every "companies" item above resolves (types.py contract).
+    if any(d["source_id"] == "companies" for d in data):
+        sources.append(Source(source_id="companies", kind="companies"))
     return ToolResult(ok=True, data=data, sources=sources)

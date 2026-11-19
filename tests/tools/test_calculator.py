@@ -99,3 +99,19 @@ def test_spec_shape():
     fn = calculator.SPEC["function"]
     assert fn["name"] == "calculate"
     assert fn["parameters"]["required"] == ["expression", "values"]
+
+
+# ---- Phase 3 review: complex/NaN/huge-int inputs must give ok=False, never raise ---------
+
+@pytest.mark.parametrize("expr,values", [
+    ("abs((-8)**0.5)", {}),                 # was a silently wrong 2.83
+    ("round((-1)**0.5)", {}),
+    ("min((-1)**0.5, 1)", {}),
+    ("round(2, (-1)**0.5)", {}),
+    ("(end / start) ** (1 / 3)", {"end": -5.0, "start": 10.0}),   # CAGR across a sign flip
+    ("round(1e308*10 - 1e308*10)", {}),
+    ("a + 1", {"a": 10**400}),
+])
+def test_review_inputs_fail_cleanly(expr, values):
+    res = calculator.call(expr, values)
+    assert res.ok is False and res.error

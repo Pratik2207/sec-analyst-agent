@@ -67,15 +67,15 @@ def _eval(node: ast.AST, values: dict[str, float]) -> float:
         right = _eval(node.right, values)
         if isinstance(node.op, ast.Pow) and abs(right) > MAX_EXPONENT:
             raise CalcError(f"exponent {right} is too large (max {MAX_EXPONENT})")
-        return _BINOPS[type(node.op)](left, right)
+        return _real(_BINOPS[type(node.op)](left, right))
     if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARYOPS:
-        return _UNARYOPS[type(node.op)](_eval(node.operand, values))
+        return _real(_UNARYOPS[type(node.op)](_eval(node.operand, values)))
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Name) or node.func.id not in _FUNCS:
             raise CalcError(f"only {', '.join(_FUNCS)} may be called")
         if node.keywords:
             raise CalcError("keyword arguments are not allowed")
-        args = [_eval(a, values) for a in node.args]
+        args = [_eval(a, values) for a in node.args]   # each already a finite real float
         name = node.func.id
         if name == "abs" and len(args) != 1:
             raise CalcError("abs takes one argument")
@@ -89,8 +89,21 @@ def _eval(node: ast.AST, values: dict[str, float]) -> float:
             return float(round(args[0]))
         if name in ("min", "max") and len(args) < 2:
             raise CalcError(f"{name} needs at least two arguments")
-        return _FUNCS[name](*args)
+        return _real(_FUNCS[name](*args))
     raise CalcError(f"{type(node).__name__} is not allowed")
+
+
+def _real(x) -> float:
+    """Every intermediate result must be a finite real number. A negative base with a
+    fractional exponent gives a Python complex (e.g. (-8)**0.5), which abs() would turn into
+    a silently wrong real; NaN/inf would make round() raise."""
+    if isinstance(x, complex):
+        raise CalcError("result is not a real number (negative base with a fractional "
+                        "exponent?)")
+    x = float(x)
+    if not math.isfinite(x):
+        raise CalcError("result is not a finite number")
+    return x
 
 
 def evaluate(expression: str, values: dict[str, float]) -> float:
@@ -104,8 +117,12 @@ def evaluate(expression: str, values: dict[str, float]) -> float:
     for name, v in values.items():
         if not isinstance(name, str) or not name.isidentifier() or "__" in name:
             raise CalcError(f"invalid name {name!r}")
-        if not _is_number(v) or not math.isfinite(v):
-            raise CalcError(f"value of {name!r} must be a finite number, not {v!r}")
+        try:
+            finite = _is_number(v) and math.isfinite(v)
+        except OverflowError:   # e.g. an int like 10**400 from JSON
+            finite = False
+        if not finite:
+            raise CalcError(f"value of {name!r} must be a finite number, not {v!r}"[:200])
     try:
         tree = ast.parse(expression.strip(), mode="eval")
     except SyntaxError as e:
@@ -116,6 +133,8 @@ def evaluate(expression: str, values: dict[str, float]) -> float:
         raise CalcError("division by zero") from e
     except OverflowError as e:
         raise CalcError("result is too large") from e
+    except (ArithmeticError, ValueError, TypeError) as e:   # defensive: never escape call()
+        raise CalcError(f"cannot evaluate: {e}") from e
     if not isinstance(result, float) or not math.isfinite(result):
         raise CalcError("result is not a finite real number")
     return result

@@ -71,7 +71,11 @@ _AGENT_WORDS = re.compile(
     r"smallest|biggest|most|least|top|trend\w*|chang\w*|grow\w*|grew|increas\w*|"
     r"decreas\w*|declin\w*|fell|fall\w*|rise|rose|raised?|ratio\w*|share of|margins?|"
     r"percent\w*|between|both|each|all|average\w*|total of|sum|combined|over time|since|"
-    r"per[ -]share|eps)\b"
+    r"per[ -]share|eps|"
+    # Quarters, segments and geographies: the facts table only holds full-year,
+    # consolidated values, so the fast path would answer a different question.
+    r"q[1-4]|quarter\w*|segment\w*|division\w*|business unit\w*|region\w*|regional|"
+    r"geograph\w*|international|domestic|country|countries|data center|client computing)\b"
     r"|%",
     re.IGNORECASE,
 )
@@ -181,7 +185,7 @@ def extract(question: str) -> tuple[dict, Tokens]:
         f"Metrics: {', '.join(metrics)} (rd_expense = research and development; "
         "revenue = sales; net_income = profit or loss). "
         "Use NONE if the question asks for anything else (text, risks, a ratio, a margin, "
-        "per-share data, cash flow, debt, guidance).\n"
+        "per-share data, cash flow, debt, guidance, a quarter, a segment or a region).\n"
         "fiscal_year: the 4-digit fiscal year asked about, or 0 if none.\n"
         f"Question: {question}"
     )

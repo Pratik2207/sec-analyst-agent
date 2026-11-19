@@ -25,3 +25,9 @@
 {"q": "Explain Pfizer's revenue decline in 2024", "kind": "agent"}
 {"q": "What was JPMorgan's earnings per share in 2024?", "kind": "agent"}
 {"q": "What did Merck say about Keytruda patent expiry in its 2025 annual report?", "kind": "agent", "llm": true}
+{"q": "What was Intel's Q4 2024 revenue?", "kind": "agent"}
+{"q": "What was Intel's data center revenue in FY2024?", "kind": "agent"}
+{"q": "What was Qualcomm's QCT segment revenue in fiscal 2025?", "kind": "agent"}
+{"q": "What was Pfizer's international revenue in 2024?", "kind": "agent"}
+{"q": "What was AMD's operating income in FY2023?", "kind": "fast", "ticker": "AMD", "metric": "operating_income", "fiscal_year": 2023}
+{"q": "Goldman Sachs net income 2025", "kind": "fast", "ticker": "GS", "metric": "net_income", "fiscal_year": 2025}
