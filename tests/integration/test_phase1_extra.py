@@ -197,4 +197,4 @@ def test_ask_bank_gross_profit_is_not_found(client):
 def test_ask_response_is_json_serialisable_with_steps(client):
     body = client.post("/ask", json={"question": "Pfizer total assets FY2023?"}).json()
     json.dumps(body)
-    assert body["steps"][0]["name"] == "extract"
+    assert body["steps"][0]["name"] == "route"   # Phase 3: router replaced extract

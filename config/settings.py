@@ -38,8 +38,10 @@ class Settings(BaseSettings):
     chunk_overlap: float = 0.15
     model_cache_dir: Path = DATA_DIR / "models"
 
-    # Phase 3: answer writer (also used by the naive RAG baseline).
-    answer_model: str = "qwen3:4b"
+    # Phase 3: answer writer (also used by the naive RAG baseline). The plain "qwen3:4b" tag
+    # is the thinking-only 2507 build (ignores think=False: ~280 tokens of reasoning even for
+    # one sentence); the same-size instruct build answers directly.
+    answer_model: str = "qwen3:4b-instruct"
     baseline_k: int = 8
 
 
