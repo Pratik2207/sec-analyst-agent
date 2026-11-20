@@ -112,5 +112,10 @@ class LangfuseTracer:
 
 def create_tracer(host: str, public_key: str, secret_key: str) -> LangfuseTracer:
     from langfuse import Langfuse  # imported only when tracing is configured
+    from opentelemetry.sdk.trace import TracerProvider
 
-    return LangfuseTracer(Langfuse(public_key=public_key, secret_key=secret_key, host=host))
+    # A dedicated provider: without one the SDK installs itself as OpenTelemetry's
+    # process-global provider, which leaks state between clients (Phase 6 tester: an
+    # order-dependent test failure) and would hijack any other OTel use in the process.
+    return LangfuseTracer(Langfuse(public_key=public_key, secret_key=secret_key, host=host,
+                                   tracer_provider=TracerProvider()))

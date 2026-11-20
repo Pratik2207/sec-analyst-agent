@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from langfuse import Langfuse
+from opentelemetry import context as otel_context
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
@@ -25,8 +26,15 @@ def lf():
         client.flush()
         return {s.name: s for s in exporter.get_finished_spans()}
 
-    yield SimpleNamespace(tracer=LangfuseTracer(client), spans=spans)
-    client.shutdown()
+    # Start from an empty OpenTelemetry context: an earlier test that built a production
+    # Langfuse client can leave a current span behind in this thread, which would become
+    # the parent of this test's root "ask" span (order-dependent failure, Phase 6 tester).
+    token = otel_context.attach(otel_context.Context())
+    try:
+        yield SimpleNamespace(tracer=LangfuseTracer(client), spans=spans)
+    finally:
+        otel_context.detach(token)
+        client.shutdown()
 
 
 def attr(span, key: str):
