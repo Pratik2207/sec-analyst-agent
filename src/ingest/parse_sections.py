@@ -391,7 +391,7 @@ def parse_filing(record: dict) -> dict:
     return {**record, **parse_html(html, record["accession_no"])}
 
 
-def main() -> None:
+def main() -> int:
     from src.ingest.download_filings import MANIFEST
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -414,7 +414,8 @@ def main() -> None:
                  summary, " (fallback)" if parsed["fallback"] else "")
     if failed:
         log.error("%d filing(s) failed to parse: %s", len(failed), ", ".join(failed))
+    return 1 if failed else 0   # run_all treats a non-zero return as a failed step
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

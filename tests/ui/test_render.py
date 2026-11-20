@@ -77,3 +77,11 @@ def test_citation_non_https_url_not_linked():
     line = citation_markdown(1, {"ticker": "X", "fiscal_year": 2024, "section": "Item 1",
                                  "url": "javascript:alert(1)"})
     assert "](" not in line
+
+
+def test_markdown_links_and_images_are_neutralised():
+    from ui.render import format_answer
+    out = format_answer("See ![x](https://attacker.invalid/a.png) and [y](javascript:alert(1)) "
+                        "rose [1].")
+    assert "](" not in out and "attacker" not in out and "javascript" not in out
+    assert "**[1]**" in out

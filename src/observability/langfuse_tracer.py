@@ -73,12 +73,12 @@ class LangfuseTracer:
 
     @contextmanager
     def trace(self, name: str, input: Any = None):
-        """The root observation of one request; flushed (in the background) when it ends."""
-        try:
-            with self._observe(name, input) as h:
-                yield h
-        finally:
-            self.flush()
+        """The root observation of one request. No per-request flush (Phase 6 review): the
+        SDK's batch processor exports ended observations in the background and flushes at
+        exit; a flush thread per request only piled up blocked threads when the Langfuse
+        server was down."""
+        with self._observe(name, input) as h:
+            yield h
 
     def span(self, name: str, input: Any = None):
         return self._observe(name, input)

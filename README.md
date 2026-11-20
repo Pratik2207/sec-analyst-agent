@@ -81,6 +81,7 @@ ollama pull qwen3:8b            # eval judge (only for evals)
 cp .env.example .env            # set SEC_USER_AGENT (your contact, required by SEC) and passwords
 
 # 3. services + app
+mkdir -p data                   # create it as your user before docker does (Linux: root-owned otherwise)
 docker compose up -d            # postgres :5433, qdrant :6333, api :8000, ui :8501 (builds the image)
 
 # 4. data (host side; pilot = 10 companies, ~30 min; --all = 50 companies, ~2 h)
@@ -95,13 +96,22 @@ curl -s localhost:8000/ask -H "content-type: application/json" \
      -d '{"question": "What was Intel'"'"'s R&D expense in FY2024?"}'
 ```
 
-**Tracing (optional):** `docker compose --profile tracing up -d` starts self-hosted Langfuse v3 at
-http://localhost:3000 (login `admin@example.com` / `local-dev-password`). Add to `.env`:
+**Tracing (optional):** first add to `.env` (the api container reads them when it is created):
 
 ```
 LANGFUSE_PUBLIC_KEY=pk-lf-local
 LANGFUSE_SECRET_KEY=sk-lf-local
+# recommended: replace the local-only defaults
+LANGFUSE_INIT_USER_PASSWORD=<your password>
+LANGFUSE_NEXTAUTH_SECRET=<random string>
+LANGFUSE_ENCRYPTION_KEY=<64 hex chars>
+LANGFUSE_MINIO_PASSWORD=<random string>
 ```
+
+then `docker compose --profile tracing up -d` starts self-hosted Langfuse v3 at
+http://localhost:3000 (login `admin@example.com` / your password). If you add the keys after the
+stack is up, run that command again so the api picks them up. Traces store your questions and
+filing excerpts on local Docker volumes.
 
 Every `/ask` becomes one trace with a span per tool call and a generation (tokens, latency) per
 LLM call. Without the keys, tracing is off.

@@ -80,7 +80,9 @@ class Settings(BaseSettings):
             def swap(url: str) -> str:
                 d = conninfo_to_dict(url)
                 d["host"] = self.db_host or d.get("host")
-                d["port"] = str(self.db_port or d.get("port"))
+                port = self.db_port or d.get("port")
+                if port:   # no "None" port when only DB_HOST is set
+                    d["port"] = str(port)
                 return make_conninfo(**d)
 
             self.database_url = swap(self.database_url)

@@ -21,6 +21,7 @@ from evals.schema import RunResult
 from src.agent import evidence, fast_path, graph, router
 from src.api.schemas import Step
 from src.baseline import naive_rag
+from src.observability.tracing import get_tracer
 from src.retrieval.hybrid_search import hybrid_search
 
 NOHEADER_COLLECTION = "filings_noheader"
@@ -69,6 +70,12 @@ def _ordered_contexts(items: list, resp) -> list[str]:
 
 
 def agent_system(question: str) -> RunResult:
+    # one trace per eval question when Langfuse is configured (not hundreds of fragments)
+    with get_tracer().trace("eval:agent", {"question": question}):
+        return _agent_system(question)
+
+
+def _agent_system(question: str) -> RunResult:
     t0 = time.perf_counter()
     try:
         r = router.route(question)

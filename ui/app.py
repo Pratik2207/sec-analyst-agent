@@ -121,11 +121,17 @@ def main() -> None:
     question = question or st.session_state.pop("pending", None)
     if not question:
         return
-    st.session_state.history.append({"role": "user", "content": question})
+    # Append the question and a placeholder answer together, then replace the placeholder:
+    # a rerun (another question, an example click) interrupts the 20-110 s stream, and the
+    # question must not be left in the history without an answer (Phase 6 review).
+    st.session_state.history += [
+        {"role": "user", "content": question},
+        {"role": "assistant", "error": "Interrupted before the answer arrived; ask again."}]
+    slot = len(st.session_state.history) - 1
     with st.chat_message("user"):
         st.markdown(question.replace("$", r"\$"))
     with st.chat_message("assistant"):
-        st.session_state.history.append(answer_live(api_url, question))
+        st.session_state.history[slot] = answer_live(api_url, question)
 
 
 main()

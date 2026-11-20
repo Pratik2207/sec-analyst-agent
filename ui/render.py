@@ -52,9 +52,15 @@ def _count(v) -> int:
 
 
 def format_answer(text: str) -> str:
-    """Markdown for the answer: `$` escaped (Streamlit would read it as LaTeX) and each [n]
-    citation marker in bold."""
-    return MARKER.sub(r"**[\1]**", text.replace("$", r"\$"))
+    """Markdown for the answer: `$` escaped (Streamlit would read it as LaTeX), Markdown
+    links/images neutralised (answer text is model output influenced by filing text; it
+    must not make the browser load remote URLs), and each [n] citation marker in bold."""
+    text = _LINK.sub(lambda m: m.group(2), text)   # ![alt](url) / [text](url) -> text
+    text = text.replace("$", r"\$").replace("<", "&lt;")
+    return MARKER.sub(r"**[\1]**", text)
+
+
+_LINK = re.compile(r"(!?)\[([^\]]*)\]\([^)]*\)")
 
 
 def citation_markdown(n: int, c: dict) -> str:

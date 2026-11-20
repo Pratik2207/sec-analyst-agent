@@ -39,6 +39,11 @@ def chat_json(model: str, system: str, user: str, schema: dict,
             # Ollama defaults to a 4096-token context; multi-hop evidence + feedback exceeds it.
             options={"temperature": 0, "num_ctx": s.llm_num_ctx}, keep_alive=KEEP_ALIVE)
     except (ollama.ResponseError, ollama.RequestError, httpx.HTTPError, ConnectionError) as e:
+        # failed/timed-out calls are the ones worth seeing in a trace (NFR-12)
+        get_tracer().generation(f"llm:{model}", model, input={"system": system[:2000],
+                                                              "user": user[:4000]},
+                                output=f"ERROR {type(e).__name__}: {e}"[:500], usage=Tokens(),
+                                latency_s=time.perf_counter() - t0)
         raise LLMError(f"{model}: {type(e).__name__}: {e}") from e
     tokens = Tokens(prompt=resp.prompt_eval_count or 0, completion=resp.eval_count or 0)
     text = _strip_reasoning(resp.message.content or "")

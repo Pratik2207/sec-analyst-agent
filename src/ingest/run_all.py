@@ -47,7 +47,12 @@ def main(all_companies: bool = False, start: str = STEP_NAMES[0]) -> int:
             results.append((name, "FAILED", time.perf_counter() - t0))
             failed = name
             break
-        # coverage.main returns 1 when there are gaps: report them, but keep going.
+        # coverage.main returns 1 when there are gaps: report them, but keep going. Any other
+        # step returning non-zero (e.g. a filing that failed to parse) is a failed step.
+        if rc and name != "coverage":
+            results.append((name, f"FAILED (rc={rc})", time.perf_counter() - t0))
+            failed = name
+            break
         status = "ok (gaps reported)" if name == "coverage" and rc else "ok"
         results.append((name, status, time.perf_counter() - t0))
 
