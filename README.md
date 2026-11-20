@@ -48,24 +48,73 @@ Key safeguards (each added after a measured failure of the 4B models — see `do
 
 ## Results
 
-> **Evaluation pending.** The eval harness (120 hand-checked questions, agent vs naive RAG,
-> 4 ablations, NFR PASS/FAIL table) is built and tested; the run itself takes ~1.5 h (quick,
-> 32 questions) to ~6 h (full) on a 4 GB GPU and has not been run yet. To produce the table:
->
-> ```
-> uv run python -m evals.run_eval --run-id pilot-v1 --per-type quick --skip-noheader
-> ```
-> The report lands in `evals/results/pilot-v1/report.md`; its headline table and the top 3
-> failure causes go here.
+Run `pilot-v1`, 2026-11-20, on the full 50-company index (150 filings, 37,358 chunks), GTX 1650 4 GB.
+It used the **quick stratified subset: 32 of the 120 questions** (10 number, 10 text, 8 multi-hop,
+4 unanswerable). The questions are about the 10 pilot companies. Full report:
+[`evals/results/pilot-v1/report.md`](evals/results/pilot-v1/report.md).
 
-Measured so far (pilot data, this machine — GTX 1650 4 GB):
+```
+uv run python -m evals.run_eval --run-id pilot-v1 --per-type quick --skip-noheader
+```
 
-| | |
+### Agent vs naive RAG
+
+| Question type | N | Agent accuracy | Baseline accuracy | Agent p50 | Baseline p50 |
+|---|---|---|---|---|---|
+| Single number | 10 | **90.0%** | 60.0% | 0.7 s | 21.2 s |
+| Text / explanation | 10 | 55.0% | **75.0%** | 120.7 s | 33.1 s |
+| Multi-hop | 8 | **75.0%** | 6.2% | 118.1 s | 25.3 s |
+| Unanswerable (refusal) | 4 | 100.0% | 100.0% | 11.9 s | 15.1 s |
+| **Overall** | 32 | **76.6%** | 56.2% | 52.4 s | 23.6 s |
+
+Citation accuracy is 100% for the agent and 94.1% for the baseline; faithfulness is 100% for both.
+On multi-hop questions with a numeric gold value, the agent matched 62.5% and the baseline 0%.
+
+### Ablations
+
+| Configuration | Result |
 |---|---|
-| Fast path (single number) | ~0.6 s warm, p50 3.6 s incl. routing on the eval sample |
-| Multi-hop (semis question) | correct ("none"), 8 citations, 42–107 s, 3 tool calls |
-| Router accuracy (33 labelled questions) | 97% |
-| Retrieval check (20 questions) | 20/20 right chunk in the top 10 |
+| Agent without the SQL tool | accuracy 22.2% vs 76.6% on number + multi-hop questions (number 30% vs 90%, multi-hop 12.5% vs 75%), at 2–8× the tokens |
+| Retrieval, full (dense + BM25 + reranker) | recall@10 100% (10/10) |
+| Retrieval without the reranker | recall@10 80% |
+| Retrieval without BM25 sparse vectors | recall@10 70% |
+| Retrieval without context headers | not run (`--skip-noheader`, which needs a second index) |
+
+### PRD targets
+
+| NFR | Target | Measured | Status |
+|---|---|---|---|
+| NFR-1 | agent accuracy ≥ 80%; ≥ +25 pts over the baseline on multi-hop | 76.6%; +68.8 pts | **FAIL** (overall accuracy 3.4 pts short; the multi-hop gap passes) |
+| NFR-2 | faithfulness ≥ 95% | 100% | PASS |
+| NFR-3 | recall@10 ≥ 85% | 100% | PASS |
+| NFR-4 | fast-path p50 < 5 s | 1.2 s | PASS |
+| NFR-5 | multi-hop p50 < 60 s, p95 < 120 s | p50 118 s, p95 197 s | **FAIL** (one local 4B model on a 4 GB GPU) |
+
+### Top 3 failure causes (9 wrong agent answers)
+
+1. **The router sends questions down the wrong path (3).**
+   - Two text questions named a company and a year, so the router treated them as single-number
+     lookups. The fast path answered a different question: Qualcomm's FY2025 revenue instead of
+     its Huawei royalties, and Bank of America's net income instead of its credit-risk concentrations.
+   - In the third, the router's extraction disagreed with itself (MRVL vs QCOM). The agent then
+     fetched R&D for the whole sector, and the answer writer missed Qualcomm's $9.04B in those
+     rows. It answered "Not found" for a value that is in the database.
+2. **The answer writer mishandles multi-hop results (3).**
+   - "How much larger were JPMorgan's assets than Bank of America's?": the model did the
+     subtraction itself. The verifier removed that unverified number, and the re-answer listed
+     both totals without the difference.
+   - A return-on-assets comparison gave only JPMorgan's ratio, as a decimal, with no comparison.
+   - **The worst case:** Merck's R&D share fell from 50.8% to 28.0%. `calculate` correctly
+     returned −22.83 points, but the answer said it "increased by 22.83 percentage points", and
+     the verifier's direction check didn't catch it.
+3. **Text answers that are incomplete or not retrieved (3).**
+   - Intel's 10-Ks are indexed as whole documents (no Item structure). The planner searched with
+     Item 1 and Item 7 filters, which match nothing for Intel, so "Why did Intel stop paying
+     dividends?" came back "Not found".
+   - Two answers were only partly right: AMD's OpenAI deal, and only one of Pfizer's IRA-selected drugs.
+
+Earlier spot checks: the router was 97% accurate on 33 labelled questions, and a 20-question
+retrieval check put the right chunk in the top 10 for 20 of 20.
 
 ## Quick start
 
@@ -131,7 +180,10 @@ reranks at 2.3 s/search vs 12.1 s for bge-reranker-base with the same 20/20 reca
 ## Data
 
 50 companies (semiconductors, banks, pharma; `config/companies.yaml`), 10-K filings FY2023–2025.
-The pilot 10 (NVDA, AMD, INTC, QCOM, JPM, BAC, GS, PFE, LLY, MRK) are ingested by default.
+The pilot 10 (NVDA, AMD, INTC, QCOM, JPM, BAC, GS, PFE, LLY, MRK) are ingested by default;
+`--all` loads all 50 (150 filings, 37,358 chunks, 712 XBRL facts). The coverage check at 50
+companies reports 14 gaps: KLAC operating income; TFC, FITB and RF revenue; and REGN gross profit.
+These metrics aren't tagged in the forms this mapping expects.
 Numbers: XBRL companyfacts mapped to 6 canonical metrics (`config/metric_map.yaml`; R&D = total
 incl. acquired IPR&D; gross profit derived where not reported). Text: 10-K Items 1, 1A, 7, 7A,
 section-aware chunks ≤ 480 tokens with context headers.
@@ -144,7 +196,10 @@ phase: `docs/PHASES.md`, `docs/phase-reports/`.
 
 ## Limitations
 
-- Pilot-scale numbers above; the 50-company run and the eval table are pending (commands above).
+- The eval numbers come from the 32-question quick subset; the full 120-question run (~6 h) hasn't
+  been run. The questions cover the 10 pilot companies, though the index holds all 50.
+- Multi-hop answers take about 2 minutes (p50 118 s) on a 4 GB GPU, which misses the PRD's 60 s target.
+- No demo GIF yet.
 - Intel's 10-Ks have no Item structure the parser recognises (indexed as whole documents; search works, item filters don't).
 - A single local 4B model writes answers; wording can vary between runs (the verifier guards numbers and directions, not style).
 - 10-K only (no 10-Q, 8-K or transcripts); US filers only.

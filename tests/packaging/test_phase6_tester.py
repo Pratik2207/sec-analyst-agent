@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parents[2]
 README = (ROOT / "README.md").read_text(encoding="utf-8")
 CLAUDE = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
 
-OWNER = "postgresql://owner:ownerpw@localhost:5433/sec_analyst"
-READER = "postgresql://agent_reader:readerpw@localhost:5433/sec_analyst"
+OWNER = "postgresql://owner:change-me@localhost:5433/sec_analyst"
+READER = "postgresql://agent_reader:change-me@localhost:5433/sec_analyst"
 
 
 def _settings(**kw) -> Settings:
@@ -32,8 +32,8 @@ def _settings(**kw) -> Settings:
 
 def test_db_host_override_rewrites_both_urls_and_keeps_credentials():
     s = _settings(db_host="postgres", db_port=5432)
-    for url, user, pw in ((s.database_url, "owner", "ownerpw"),
-                          (s.agent_database_url, "agent_reader", "readerpw")):
+    for url, user, pw in ((s.database_url, "owner", "change-me"),
+                          (s.agent_database_url, "agent_reader", "change-me")):
         d = conninfo_to_dict(url)
         assert (d["host"], d["port"], d["user"], d["password"], d["dbname"]) == \
             ("postgres", "5432", user, pw, "sec_analyst")
@@ -199,8 +199,8 @@ def test_step_returning_nonzero_is_a_failure(monkeypatch, capsys):
 
 def test_db_host_only_with_portless_url_has_no_bogus_port():
     s = Settings(_env_file=None, sec_user_agent="t t@example.com",
-                 database_url="postgresql://o:p@localhost/sec_analyst",
-                 agent_database_url="postgresql://r:p@localhost/sec_analyst", db_host="postgres")
+                 database_url="postgresql://o:change-me@localhost/sec_analyst",
+                 agent_database_url="postgresql://r:change-me@localhost/sec_analyst", db_host="postgres")
     for url in (s.database_url, s.agent_database_url):
         d = conninfo_to_dict(url)
         assert d["host"] == "postgres" and d.get("port") in (None, "")
